@@ -1,0 +1,46 @@
+tanh_controller:
+  ros__parameters:
+    topics:
+      vehicle_odometry: /fmu/out/vehicle_odometry
+      trajectory_setpoint: /tanh_controller/trajectory_setpoint
+      actuator_motors: /fmu/in/actuator_motors
+      offboard_control_mode: /fmu/in/offboard_control_mode
+      vehicle_command: /fmu/in/vehicle_command
+
+    control_rate_hz: 100.0
+    publish_offboard_control_mode: true
+    auto_offboard: false
+    auto_arm: false
+    offboard_warmup: 10
+
+    model:
+      mass: 1.0
+      gravity: 9.81
+      inertia_diag: [0.01, 0.01, 0.02]
+
+    position:
+      M1: [1.0, 1.0, 1.0]
+      K1: [2.0, 2.0, 2.0]
+      M2: [4.0, 4.0, 4.0]
+      K2: [1.5, 1.5, 1.5]
+      observer:
+        Pv: [0.5, 0.5, 0.5]
+        Lv: [5.0, 5.0, 5.0]
+
+    attitude:
+      M_theta: [4.0, 4.0, 2.0]
+      K_theta: [2.0, 2.0, 2.0]
+      M_omega: [0.8, 0.8, 0.6]
+      K_omega: [3.0, 3.0, 2.0]
+      observer:
+        P_omega: [0.2, 0.2, 0.2]
+        L_omega: [5.0, 5.0, 5.0]
+
+    allocation:
+      l: 0.2
+      beta: 0.78539816339
+      cq_ct: 0.01
+
+    motor:
+      force_max: 10.0
+

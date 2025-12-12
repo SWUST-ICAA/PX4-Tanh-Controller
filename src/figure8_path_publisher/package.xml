@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>figure8_path_publisher</name>
+  <version>0.0.1</version>
+  <description>8字形轨迹生成与发布：可发布给自定义控制器，也可直接发布PX4 TrajectorySetpoint供内置PID跟踪。</description>
+
+  <maintainer email="todo@todo.com">todo</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>px4_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>geometry_msgs</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
+

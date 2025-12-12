@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>tanh_controller</name>
+  <version>0.0.1</version>
+  <description>基于tanh S形反馈的PX4四旋翼鲁棒控制器（位置+姿态+扰动观测器），直接输出电机归一化推力。</description>
+
+  <maintainer email="todo@todo.com">todo</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>px4_msgs</depend>
+  <depend>tf2</depend>
+  <depend>tf2_eigen</depend>
+
+  <!-- Eigen3 是系统/ROS CMake 包 -->
+  <build_depend>eigen3_cmake_module</build_depend>
+  <exec_depend>eigen3_cmake_module</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
+

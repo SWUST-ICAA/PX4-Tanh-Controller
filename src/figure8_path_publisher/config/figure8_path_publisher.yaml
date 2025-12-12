@@ -1,0 +1,33 @@
+figure8_path_publisher:
+  ros__parameters:
+    publish_to_controller: true
+    publish_to_px4: true
+    publish_path: false
+    publish_rate_hz: 50.0
+
+    topics:
+      controller_setpoint: /tanh_controller/trajectory_setpoint
+      px4_setpoint: /fmu/in/trajectory_setpoint
+      px4_offboard_control_mode: /fmu/in/offboard_control_mode
+      px4_vehicle_command: /fmu/in/vehicle_command
+      path: /figure8/path
+
+    path:
+      frame_id: map
+      max_points: 500
+
+    px4:
+      publish_offboard_control_mode: true
+      auto_offboard: true
+      auto_arm: true
+      offboard_warmup: 10
+
+    trajectory:
+      amplitude_x: 2.0
+      amplitude_y: 1.0
+      period_s: 20.0
+      center: [0.0, 0.0, -2.0]
+      yaw_mode: tangent   # tangent / fixed
+      fixed_yaw: 0.0
+      yaw_offset: 0.0
+
