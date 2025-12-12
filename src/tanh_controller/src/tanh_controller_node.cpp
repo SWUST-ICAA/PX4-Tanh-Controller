@@ -59,22 +59,25 @@ TanhControllerNode::TanhControllerNode(const rclcpp::NodeOptions & options)
 
   loadParams();
 
-  const auto qos_sensor = rclcpp::SensorDataQoS();
-  const auto qos_cmd = rclcpp::QoS(rclcpp::KeepLast(10)).best_effort().durability_volatile();
+  // 订阅PX4发布(/fmu/out/...)的话题必须使用兼容QoS，否则可能收不到数据
+  const auto qos_px4_out = rclcpp::QoS(rclcpp::KeepLast(10)).best_effort().durability_volatile();
+
+  // 发布到PX4订阅(/fmu/in/...)的话题不需要特殊QoS（默认QoS与PX4兼容）
+  const auto qos_default = rclcpp::QoS(rclcpp::KeepLast(10));
 
   odom_sub_ = this->create_subscription<px4_msgs::msg::VehicleOdometry>(
-    topic_vehicle_odometry_, qos_sensor,
+    topic_vehicle_odometry_, qos_px4_out,
     std::bind(&TanhControllerNode::odomCallback, this, std::placeholders::_1));
 
   setpoint_sub_ = this->create_subscription<px4_msgs::msg::TrajectorySetpoint>(
-    topic_trajectory_setpoint_, qos_cmd,
+    topic_trajectory_setpoint_, qos_default,
     std::bind(&TanhControllerNode::setpointCallback, this, std::placeholders::_1));
 
-  motors_pub_ = this->create_publisher<px4_msgs::msg::ActuatorMotors>(topic_actuator_motors_, qos_cmd);
+  motors_pub_ = this->create_publisher<px4_msgs::msg::ActuatorMotors>(topic_actuator_motors_, qos_default);
   offboard_mode_pub_ =
-    this->create_publisher<px4_msgs::msg::OffboardControlMode>(topic_offboard_control_mode_, qos_cmd);
+    this->create_publisher<px4_msgs::msg::OffboardControlMode>(topic_offboard_control_mode_, qos_default);
   vehicle_command_pub_ =
-    this->create_publisher<px4_msgs::msg::VehicleCommand>(topic_vehicle_command_, qos_cmd);
+    this->create_publisher<px4_msgs::msg::VehicleCommand>(topic_vehicle_command_, qos_default);
 
   const auto period = std::chrono::duration<double>(1.0 / std::max(1.0, control_rate_hz_));
   timer_ = this->create_wall_timer(

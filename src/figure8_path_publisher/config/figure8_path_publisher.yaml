@@ -10,6 +10,7 @@ figure8_path_publisher:
       px4_setpoint: /fmu/in/trajectory_setpoint
       px4_offboard_control_mode: /fmu/in/offboard_control_mode
       px4_vehicle_command: /fmu/in/vehicle_command
+      vehicle_odometry: /fmu/out/vehicle_odometry
       path: /figure8/path
 
     path:
@@ -22,6 +23,13 @@ figure8_path_publisher:
       auto_arm: true
       offboard_warmup: 10
 
+    takeoff:
+      enable: true
+      target_z: -2.0         # NED: 向上为负；建议与trajectory.center[2]保持一致，避免切换跳变
+      z_threshold: 0.2
+      hover_time_s: 1.0
+      timeout_s: 0.0         # <=0表示不超时
+
     trajectory:
       amplitude_x: 2.0
       amplitude_y: 1.0
@@ -30,4 +38,3 @@ figure8_path_publisher:
       yaw_mode: tangent   # tangent / fixed
       fixed_yaw: 0.0
       yaw_offset: 0.0
-

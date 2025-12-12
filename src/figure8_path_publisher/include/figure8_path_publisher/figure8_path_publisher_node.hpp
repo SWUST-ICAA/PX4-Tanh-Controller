@@ -7,6 +7,7 @@
 #include <px4_msgs/msg/offboard_control_mode.hpp>
 #include <px4_msgs/msg/trajectory_setpoint.hpp>
 #include <px4_msgs/msg/vehicle_command.hpp>
+#include <px4_msgs/msg/vehicle_odometry.hpp>
 
 namespace figure8_path_publisher {
 
@@ -20,6 +21,9 @@ public:
   explicit Figure8PathPublisherNode(const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
 
 private:
+  /** @brief 里程计回调：用于起飞阶段判断是否到达目标高度 */
+  void odomCallback(const px4_msgs::msg::VehicleOdometry::SharedPtr msg);
+
   /** @brief 定时发布：计算8字轨迹并发布消息 */
   void onTimer();
 
@@ -32,6 +36,8 @@ private:
 private:
   rclcpp::TimerBase::SharedPtr timer_;
 
+  rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr odom_sub_;
+
   rclcpp::Publisher<px4_msgs::msg::TrajectorySetpoint>::SharedPtr controller_setpoint_pub_;
   rclcpp::Publisher<px4_msgs::msg::TrajectorySetpoint>::SharedPtr px4_setpoint_pub_;
   rclcpp::Publisher<px4_msgs::msg::OffboardControlMode>::SharedPtr px4_offboard_mode_pub_;
@@ -40,6 +46,12 @@ private:
 
   rclcpp::Time start_time_;
   bool started_{false};
+
+  // 里程计缓存（NED）
+  bool has_odom_{false};
+  double odom_x_{0.0};
+  double odom_y_{0.0};
+  double odom_z_{0.0};
 
   // 参数：发布开关/话题
   bool publish_to_controller_{true};
@@ -50,6 +62,7 @@ private:
   std::string topic_px4_setpoint_;
   std::string topic_px4_offboard_control_mode_;
   std::string topic_px4_vehicle_command_;
+  std::string topic_vehicle_odometry_;
   std::string topic_path_;
   std::string path_frame_id_;
 
@@ -59,6 +72,17 @@ private:
   bool auto_arm_{false};
   int offboard_warmup_{10};
   int offboard_counter_{0};
+
+  // 起飞阶段：先到达指定高度，再开始发布8字轨迹
+  bool takeoff_enable_{false};
+  double takeoff_target_z_{-2.0};          ///< 目标高度（NED z，向上为负）
+  double takeoff_z_threshold_{0.2};        ///< 到达阈值 [m]
+  double takeoff_hover_time_s_{1.0};       ///< 到达后悬停时间 [s]
+  double takeoff_timeout_s_{0.0};          ///< 超时 [s]，<=0表示不超时
+  bool takeoff_reached_{false};
+  bool takeoff_done_{false};
+  rclcpp::Time takeoff_start_time_;
+  rclcpp::Time takeoff_reached_time_;
 
   // 参数：轨迹
   double amplitude_x_{2.0};
@@ -79,4 +103,3 @@ private:
 };
 
 }  // namespace figure8_path_publisher
-
