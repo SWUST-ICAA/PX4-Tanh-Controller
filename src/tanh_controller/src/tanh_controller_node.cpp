@@ -31,9 +31,10 @@ TanhControllerNode::TanhControllerNode(const rclcpp::NodeOptions & options)
   this->declare_parameter<int>("offboard_warmup", 10);
 
   // 模型参数
-  this->declare_parameter<double>("model.mass", 1.0);
+  this->declare_parameter<double>("model.mass", 2.0643076923);
   this->declare_parameter<double>("model.gravity", 9.81);
-  this->declare_parameter<std::vector<double>>("model.inertia_diag", {0.01, 0.01, 0.02});
+  this->declare_parameter<std::vector<double>>(
+    "model.inertia_diag", {0.02383948, 0.02394241, 0.04399995});
 
   // 位置环参数
   this->declare_parameter<std::vector<double>>("position.M1", {1.0, 1.0, 1.0});
@@ -52,10 +53,11 @@ TanhControllerNode::TanhControllerNode(const rclcpp::NodeOptions & options)
   this->declare_parameter<std::vector<double>>("attitude.observer.L_omega", {5.0, 5.0, 5.0});
 
   // 控制分配/电机映射参数
-  this->declare_parameter<double>("allocation.l", 0.2);
+  this->declare_parameter<double>("allocation.l", 0.246073);
   this->declare_parameter<double>("allocation.beta", M_PI_4);
-  this->declare_parameter<double>("allocation.cq_ct", 0.01);
-  this->declare_parameter<double>("motor.force_max", 10.0);
+  this->declare_parameter<double>("allocation.cq_ct", 0.016);
+  this->declare_parameter<double>("motor.force_max", 8.54858);
+  this->declare_parameter<std::vector<int64_t>>("motor.output_map", {1, 3, 0, 2});
 
   loadParams();
 
@@ -142,6 +144,34 @@ void TanhControllerNode::loadParams()
   controller_.setAllocationParams(ap);
 
   controller_.setMotorForceMax(this->get_parameter("motor.force_max").as_double());
+
+  {
+    const auto map = this->get_parameter("motor.output_map").as_integer_array();
+    if (map.size() == 4) {
+      bool ok = true;
+      std::array<bool, 4> used{{false, false, false, false}};
+      for (size_t i = 0; i < 4; ++i) {
+        const int idx = static_cast<int>(map[i]);
+        if (idx < 0 || idx >= 4) {
+          ok = false;
+          break;
+        }
+        if (used[idx]) {
+          ok = false;
+          break;
+        }
+        used[idx] = true;
+        motor_output_map_[i] = idx;
+      }
+      if (!ok) {
+        RCLCPP_WARN(this->get_logger(), "motor.output_map无效，回退为默认映射");
+        motor_output_map_ = {{1, 3, 0, 2}};
+      }
+    } else {
+      RCLCPP_WARN(this->get_logger(), "motor.output_map长度不是4，回退为默认映射");
+      motor_output_map_ = {{1, 3, 0, 2}};
+    }
+  }
 }
 
 Eigen::Vector3d TanhControllerNode::getVec3Param(rclcpp::Node & node, const std::string & name)
@@ -275,8 +305,10 @@ void TanhControllerNode::controlLoop()
 
   const float nan = std::numeric_limits<float>::quiet_NaN();
   motors.control.fill(nan);
-  for (int i = 0; i < 4; ++i) {
-    motors.control[i] = static_cast<float>(out.motor_controls(i));
+  // 输出顺序按PX4电机函数顺序（motor.output_map可配置）
+  for (int out_i = 0; out_i < 4; ++out_i) {
+    const int internal_i = motor_output_map_[out_i];
+    motors.control[out_i] = static_cast<float>(out.motor_controls(internal_i));
   }
 
   motors_pub_->publish(motors);

@@ -9,38 +9,38 @@ tanh_controller:
 
     control_rate_hz: 100.0
     publish_offboard_control_mode: true
-    auto_offboard: false
-    auto_arm: false
+    auto_offboard: true
+    auto_arm: true
     offboard_warmup: 10
 
     model:
-      mass: 1.0
+      mass: 2.0643076923
       gravity: 9.81
-      inertia_diag: [0.01, 0.01, 0.02]
+      inertia_diag: [0.02383948, 0.02394241, 0.04399995]
 
     position:
-      M1: [1.0, 1.0, 1.0]
-      K1: [2.0, 2.0, 2.0]
-      M2: [4.0, 4.0, 4.0]
-      K2: [1.5, 1.5, 1.5]
+      M1: [4.0, 4.0, 4.0]
+      K1: [30.0, 30.0, 30.0]
+      M2: [12.0, 12.0, 12.0]
+      K2: [30.0, 30.0, 30.0]
       observer:
-        Pv: [0.5, 0.5, 0.5]
+        Pv: [1.0, 1.0, 1.0]
         Lv: [5.0, 5.0, 5.0]
 
     attitude:
-      M_theta: [4.0, 4.0, 2.0]
-      K_theta: [2.0, 2.0, 2.0]
-      M_omega: [0.8, 0.8, 0.6]
-      K_omega: [3.0, 3.0, 2.0]
+      M_theta: [5.0, 5.0, 5.0]
+      K_theta: [50.0, 50.0, 50.0]
+      M_omega: [40.0, 40.0, 40.0]
+      K_omega: [50.0, 50.0, 50.0]
       observer:
-        P_omega: [0.2, 0.2, 0.2]
+        P_omega: [1.0, 1.0, 1.0]
         L_omega: [5.0, 5.0, 5.0]
 
     allocation:
-      l: 0.2
+      l: 0.246073
       beta: 0.78539816339
-      cq_ct: 0.01
+      cq_ct: 0.016
 
     motor:
-      force_max: 10.0
-
+      force_max: 8.54858
+      output_map: [1, 3, 0, 2]   # 输出索引0..3 <- 内部索引(默认G1列)：[前左, 前右, 后右, 后左]

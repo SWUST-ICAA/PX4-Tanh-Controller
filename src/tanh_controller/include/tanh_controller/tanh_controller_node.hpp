@@ -2,6 +2,8 @@
 
 #include <rclcpp/rclcpp.hpp>
 
+#include <array>
+
 #include <px4_msgs/msg/actuator_motors.hpp>
 #include <px4_msgs/msg/offboard_control_mode.hpp>
 #include <px4_msgs/msg/trajectory_setpoint.hpp>
@@ -72,6 +74,10 @@ private:
   double control_rate_hz_{100.0};
   bool publish_offboard_control_mode_{true};
 
+  // 电机输出顺序映射：out[i] = internal[motor_output_map_[i]]
+  // internal顺序来自G1列顺序（默认：前左、前右、后右、后左）
+  std::array<int, 4> motor_output_map_{{1, 3, 0, 2}};
+
   bool enable_auto_offboard_{false};
   bool enable_auto_arm_{false};
   int offboard_setpoint_warmup_{10};
@@ -79,4 +85,3 @@ private:
 };
 
 }  // namespace tanh_controller
-

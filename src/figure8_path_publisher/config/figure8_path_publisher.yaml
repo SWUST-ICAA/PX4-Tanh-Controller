@@ -1,7 +1,7 @@
 figure8_path_publisher:
   ros__parameters:
     publish_to_controller: true
-    publish_to_px4: true
+    publish_to_px4: false
     publish_path: false
     publish_rate_hz: 50.0
 
@@ -35,6 +35,6 @@ figure8_path_publisher:
       amplitude_y: 1.0
       period_s: 20.0
       center: [0.0, 0.0, -2.0]
-      yaw_mode: tangent   # tangent / fixed
+      yaw_mode: fixed   # tangent / fixed
       fixed_yaw: 0.0
       yaw_offset: 0.0
