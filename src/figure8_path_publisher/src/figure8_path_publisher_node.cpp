@@ -132,6 +132,21 @@ void Figure8PathPublisherNode::odomCallback(const px4_msgs::msg::VehicleOdometry
   odom_x_ = msg->position[0];
   odom_y_ = msg->position[1];
   odom_z_ = msg->position[2];
+
+  // 计算航向角（NED系的yaw/heading）
+  const double qw = msg->q[0];
+  const double qx = msg->q[1];
+  const double qy = msg->q[2];
+  const double qz = msg->q[3];
+  if (std::isfinite(qw) && std::isfinite(qx) && std::isfinite(qy) && std::isfinite(qz)) {
+    const double siny_cosp = 2.0 * (qw * qz + qx * qy);
+    const double cosy_cosp = 1.0 - 2.0 * (qy * qy + qz * qz);
+    odom_yaw_ = wrapPi(std::atan2(siny_cosp, cosy_cosp));
+    if (!has_initial_yaw_) {
+      initial_yaw_ = odom_yaw_;
+      has_initial_yaw_ = true;
+    }
+  }
   has_odom_ = true;
 }
 
@@ -186,12 +201,14 @@ void Figure8PathPublisherNode::onTimer()
     const double y = center_y_;
     const double z = takeoff_target_z_;
 
-    // 起飞阶段的航向：与轨迹起始航向保持一致，避免切换瞬间大幅摆头
+    // 起飞阶段的航向：默认尽量保持与起飞时一致，避免大幅摆头占用推力裕量
     double yaw = fixed_yaw_;
     if (yaw_mode_ == "tangent") {
       yaw = wrapPi(std::atan2(amplitude_y_, amplitude_x_) + yaw_offset_);
     } else if (yaw_mode_ == "fixed") {
       yaw = wrapPi(fixed_yaw_ + yaw_offset_);
+    } else if (yaw_mode_ == "hold") {
+      yaw = has_initial_yaw_ ? wrapPi(initial_yaw_ + yaw_offset_) : wrapPi(fixed_yaw_ + yaw_offset_);
     }
 
     const uint64_t now_us = static_cast<uint64_t>(now.nanoseconds() / 1000ULL);
@@ -306,6 +323,9 @@ void Figure8PathPublisherNode::onTimer()
     }
   } else if (yaw_mode_ == "fixed") {
     yaw = wrapPi(fixed_yaw_ + yaw_offset_);
+    last_yaw_ = yaw;
+  } else if (yaw_mode_ == "hold") {
+    yaw = has_initial_yaw_ ? wrapPi(initial_yaw_ + yaw_offset_) : wrapPi(fixed_yaw_ + yaw_offset_);
     last_yaw_ = yaw;
   }
 

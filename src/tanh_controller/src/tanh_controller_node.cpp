@@ -191,6 +191,19 @@ void TanhControllerNode::odomCallback(const px4_msgs::msg::VehicleOdometry::Shar
     return;
   }
 
+  // 基本有效性检查：避免NaN传播导致控制输出全为0
+  const bool pos_ok =
+    std::isfinite(msg->position[0]) && std::isfinite(msg->position[1]) && std::isfinite(msg->position[2]);
+  const bool q_ok =
+    std::isfinite(msg->q[0]) && std::isfinite(msg->q[1]) && std::isfinite(msg->q[2]) && std::isfinite(msg->q[3]);
+
+  if (!pos_ok || !q_ok) {
+    RCLCPP_WARN_THROTTLE(
+      this->get_logger(), *this->get_clock(), 2000,
+      "vehicle_odometry包含无效数据(position/q为NaN)，等待估计器就绪...");
+    return;
+  }
+
   // 计算里程计dt（PX4时间戳单位us），仅用于诊断/观测
   if (last_odom_us_ != 0 && msg->timestamp > last_odom_us_) {
     const double dt = static_cast<double>(msg->timestamp - last_odom_us_) * 1e-6;
@@ -210,10 +223,17 @@ void TanhControllerNode::odomCallback(const px4_msgs::msg::VehicleOdometry::Shar
   state_.q_body_to_ned = q;
 
   state_.position_ned = Eigen::Vector3d(msg->position[0], msg->position[1], msg->position[2]);
-  state_.angular_velocity_body =
-    Eigen::Vector3d(msg->angular_velocity[0], msg->angular_velocity[1], msg->angular_velocity[2]);
+  {
+    const double wx = std::isfinite(msg->angular_velocity[0]) ? msg->angular_velocity[0] : 0.0;
+    const double wy = std::isfinite(msg->angular_velocity[1]) ? msg->angular_velocity[1] : 0.0;
+    const double wz = std::isfinite(msg->angular_velocity[2]) ? msg->angular_velocity[2] : 0.0;
+    state_.angular_velocity_body = Eigen::Vector3d(wx, wy, wz);
+  }
 
-  const Eigen::Vector3d v_raw(msg->velocity[0], msg->velocity[1], msg->velocity[2]);
+  const double vx = std::isfinite(msg->velocity[0]) ? msg->velocity[0] : 0.0;
+  const double vy = std::isfinite(msg->velocity[1]) ? msg->velocity[1] : 0.0;
+  const double vz = std::isfinite(msg->velocity[2]) ? msg->velocity[2] : 0.0;
+  const Eigen::Vector3d v_raw(vx, vy, vz);
   if (msg->velocity_frame == px4_msgs::msg::VehicleOdometry::VELOCITY_FRAME_NED) {
     state_.velocity_ned = v_raw;
   } else if (msg->velocity_frame == px4_msgs::msg::VehicleOdometry::VELOCITY_FRAME_BODY_FRD) {

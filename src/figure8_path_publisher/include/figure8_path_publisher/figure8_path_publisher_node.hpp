@@ -52,6 +52,9 @@ private:
   double odom_x_{0.0};
   double odom_y_{0.0};
   double odom_z_{0.0};
+  double odom_yaw_{0.0};
+  bool has_initial_yaw_{false};
+  double initial_yaw_{0.0};
 
   // 参数：发布开关/话题
   bool publish_to_controller_{true};
@@ -92,7 +95,7 @@ private:
   double center_y_{0.0};
   double center_z_{-2.0};  // NED: 上升为负
 
-  std::string yaw_mode_{"tangent"};  // tangent/fixed
+  std::string yaw_mode_{"tangent"};  // tangent/fixed/hold
   double fixed_yaw_{0.0};
   double yaw_offset_{0.0};
   double last_yaw_{0.0};

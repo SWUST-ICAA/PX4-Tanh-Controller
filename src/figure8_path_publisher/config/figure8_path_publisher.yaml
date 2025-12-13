@@ -35,6 +35,6 @@ figure8_path_publisher:
       amplitude_y: 1.0
       period_s: 20.0
       center: [0.0, 0.0, -2.0]
-      yaw_mode: fixed   # tangent / fixed
+      yaw_mode: hold    # tangent / fixed / hold（hold=保持初始航向）
       fixed_yaw: 0.0
       yaw_offset: 0.0
