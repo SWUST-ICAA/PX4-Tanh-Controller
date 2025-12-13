@@ -191,21 +191,41 @@ void TanhControllerNode::odomCallback(const px4_msgs::msg::VehicleOdometry::Shar
     return;
   }
 
-  // 计算dt（PX4时间戳单位us）
+  // 计算里程计dt（PX4时间戳单位us），仅用于诊断/观测
   if (last_odom_us_ != 0 && msg->timestamp > last_odom_us_) {
     const double dt = static_cast<double>(msg->timestamp - last_odom_us_) * 1e-6;
-    last_dt_ = std::clamp(dt, 1e-4, 0.1);
+    last_odom_dt_ = std::clamp(dt, 1e-4, 0.1);
   }
   last_odom_us_ = msg->timestamp;
 
-  state_.position_ned = Eigen::Vector3d(msg->position[0], msg->position[1], msg->position[2]);
-  state_.velocity_ned = Eigen::Vector3d(msg->velocity[0], msg->velocity[1], msg->velocity[2]);
-  state_.angular_velocity_body =
-    Eigen::Vector3d(msg->angular_velocity[0], msg->angular_velocity[1], msg->angular_velocity[2]);
+  if (msg->pose_frame != px4_msgs::msg::VehicleOdometry::POSE_FRAME_NED) {
+    RCLCPP_WARN_THROTTLE(
+      this->get_logger(), *this->get_clock(), 5000,
+      "vehicle_odometry.pose_frame不是NED(%u)，当前控制器按NED解释，可能导致不稳定",
+      static_cast<unsigned>(msg->pose_frame));
+  }
 
   Eigen::Quaterniond q(msg->q[0], msg->q[1], msg->q[2], msg->q[3]);
   q.normalize();
   state_.q_body_to_ned = q;
+
+  state_.position_ned = Eigen::Vector3d(msg->position[0], msg->position[1], msg->position[2]);
+  state_.angular_velocity_body =
+    Eigen::Vector3d(msg->angular_velocity[0], msg->angular_velocity[1], msg->angular_velocity[2]);
+
+  const Eigen::Vector3d v_raw(msg->velocity[0], msg->velocity[1], msg->velocity[2]);
+  if (msg->velocity_frame == px4_msgs::msg::VehicleOdometry::VELOCITY_FRAME_NED) {
+    state_.velocity_ned = v_raw;
+  } else if (msg->velocity_frame == px4_msgs::msg::VehicleOdometry::VELOCITY_FRAME_BODY_FRD) {
+    // 速度在机体系(FRD)，旋转到NED
+    state_.velocity_ned = q * v_raw;
+  } else {
+    RCLCPP_WARN_THROTTLE(
+      this->get_logger(), *this->get_clock(), 5000,
+      "vehicle_odometry.velocity_frame=%u未处理，当前直接按NED使用，可能导致不稳定",
+      static_cast<unsigned>(msg->velocity_frame));
+    state_.velocity_ned = v_raw;
+  }
 
   has_state_ = true;
 }
@@ -259,6 +279,12 @@ void TanhControllerNode::controlLoop()
 {
   // 周期控制循环：发布offboard模式并输出电机控制
   const uint64_t now_us = static_cast<uint64_t>(this->get_clock()->now().nanoseconds() / 1000ULL);
+  double dt = 1.0 / std::max(1.0, control_rate_hz_);
+  if (last_control_us_ != 0 && now_us > last_control_us_) {
+    dt = static_cast<double>(now_us - last_control_us_) * 1e-6;
+  }
+  last_control_us_ = now_us;
+  dt = std::clamp(dt, 1e-4, 0.1);
 
   if (publish_offboard_control_mode_ && offboard_mode_pub_) {
     px4_msgs::msg::OffboardControlMode mode{};
@@ -274,7 +300,10 @@ void TanhControllerNode::controlLoop()
   }
 
   // 可选：自动切offboard/解锁（默认关闭，避免误操作）
-  if ((enable_auto_offboard_ || enable_auto_arm_) && offboard_counter_ <= offboard_setpoint_warmup_) {
+  // 为避免在参考/状态未就绪时误解锁导致坠机，这里要求已收到状态与参考后才开始计数
+  if ((enable_auto_offboard_ || enable_auto_arm_) && has_state_ && has_ref_ &&
+    offboard_counter_ <= offboard_setpoint_warmup_)
+  {
     offboard_counter_++;
     if (offboard_counter_ == offboard_setpoint_warmup_) {
       if (enable_auto_offboard_) {
@@ -294,7 +323,7 @@ void TanhControllerNode::controlLoop()
   }
 
   ControlOutput out;
-  if (!controller_.compute(state_, ref_, last_dt_, &out)) {
+  if (!controller_.compute(state_, ref_, dt, &out)) {
     return;
   }
 

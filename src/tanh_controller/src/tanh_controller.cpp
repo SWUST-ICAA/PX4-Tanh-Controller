@@ -175,7 +175,9 @@ void TanhController::computeAttitude(
 {
   // 姿态环：计算期望力矩，并更新角速度扰动观测器
   Eigen::Quaterniond q = state.q_body_to_ned.normalized();
-  Eigen::Quaterniond q_err = q_d * q.conjugate();  // (23)
+  // PX4的姿态四元数定义为：机体(FRD)->NED。
+  // 为保证负反馈方向一致，这里使用 q_err = q_d^{-1} ⊗ q（对应 R_err = R_d^T * R）。
+  Eigen::Quaterniond q_err = q_d.conjugate() * q;
 
   if (q_err.w() < 0.0) {
     q_err.coeffs() *= -1.0;  // (24)

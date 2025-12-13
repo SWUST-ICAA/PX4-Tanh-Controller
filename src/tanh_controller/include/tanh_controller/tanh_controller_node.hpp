@@ -59,7 +59,8 @@ private:
   bool has_state_{false};
   bool has_ref_{false};
   uint64_t last_odom_us_{0};
-  double last_dt_{0.01};
+  double last_odom_dt_{0.01};
+  uint64_t last_control_us_{0};
 
   // 控制器
   TanhController controller_{};
