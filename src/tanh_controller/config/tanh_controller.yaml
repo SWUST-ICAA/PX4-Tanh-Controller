@@ -7,7 +7,7 @@ tanh_controller:
       offboard_control_mode: /fmu/in/offboard_control_mode
       vehicle_command: /fmu/in/vehicle_command
 
-    control_rate_hz: 100.0
+    control_rate_hz: 1000.0
     publish_offboard_control_mode: true
     auto_offboard: true
     auto_arm: true
@@ -19,9 +19,9 @@ tanh_controller:
       inertia_diag: [0.02384669, 0.02394962, 0.04399995]
 
     position:
-      M1: [1.0, 1.0, 1.0]
-      K1: [1.5, 1.5, 1.5]
-      M2: [3.0, 3.0, 3.0]
+      M1: [2.0, 2.0, 2.0]
+      K1: [0.5, 0.5, 0.5]
+      M2: [4.0, 4.0, 4.0]
       K2: [1.0, 1.0, 1.0]
       max_tilt_deg: 35.0
       observer:
@@ -29,10 +29,10 @@ tanh_controller:
         Lv: [5.0, 5.0, 5.0]
 
     attitude:
-      M_theta: [3.0, 3.0, 3.0]
-      K_theta: [4.0, 4.0, 4.0]
-      M_omega: [20.0, 20.0, 15.0]
-      K_omega: [2.0, 2.0, 2.0]
+      M_theta: [2.0, 2.0, 2.0]
+      K_theta: [3.0, 3.0, 3.0]
+      M_omega: [5.0, 5.0, 5.0]
+      K_omega: [8.0, 8.0, 8.0]
       observer:
         P_omega: [0.0, 0.0, 0.0]
         L_omega: [5.0, 5.0, 5.0]
