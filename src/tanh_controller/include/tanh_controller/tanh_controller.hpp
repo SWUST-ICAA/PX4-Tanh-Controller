@@ -21,7 +21,12 @@ struct VehicleState
 struct TrajectoryRef
 {
   Eigen::Vector3d position_ned{Eigen::Vector3d::Zero()}; ///< 期望位置 [m]
+  Eigen::Vector3d velocity_ned{Eigen::Vector3d::Zero()}; ///< 期望速度 [m/s]（可选）
+  Eigen::Vector3d acceleration_ned{Eigen::Vector3d::Zero()}; ///< 期望加速度 [m/s^2]（可选）
   double yaw{0.0};                                       ///< 期望航向角 [rad]
+  double yawspeed{0.0};                                  ///< 期望航向角速度 [rad/s]（可选）
+  bool has_velocity{false};                              ///< 是否提供速度前馈
+  bool has_acceleration{false};                          ///< 是否提供加速度前馈
   bool valid{false};                                    ///< 是否有效
 };
 
@@ -102,6 +107,9 @@ public:
   /** @brief 设置单电机最大推力，用于归一化映射 */
   void setMotorForceMax(double max_force);
 
+  /** @brief 设置位置环最大倾角限制（单位rad，<=0表示不限制） */
+  void setMaxTilt(double max_tilt_rad);
+
   /** @brief 重置观测器状态 */
   void reset();
 
@@ -147,6 +155,7 @@ private:
   AttitudeGains att_gains_{};
   AllocationParams alloc_{};
   double motor_force_max_{10.0};
+  double max_tilt_rad_{0.0};
 
   Eigen::Vector3d e_hat_v_{Eigen::Vector3d::Zero()};      ///< 速度误差观测器状态
   Eigen::Vector3d e_hat_omega_{Eigen::Vector3d::Zero()};  ///< 角速度误差观测器状态
@@ -154,4 +163,3 @@ private:
 };
 
 }  // namespace tanh_controller
-

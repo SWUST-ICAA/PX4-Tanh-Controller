@@ -31,24 +31,25 @@ TanhControllerNode::TanhControllerNode(const rclcpp::NodeOptions & options)
   this->declare_parameter<int>("offboard_warmup", 10);
 
   // 模型参数
-  this->declare_parameter<double>("model.mass", 2.0643076923);
+  this->declare_parameter<double>("model.mass", 2.0643076923076915);
   this->declare_parameter<double>("model.gravity", 9.81);
   this->declare_parameter<std::vector<double>>(
-    "model.inertia_diag", {0.02383948, 0.02394241, 0.04399995});
+    "model.inertia_diag", {0.02384669, 0.02394962, 0.04399995});
 
   // 位置环参数
   this->declare_parameter<std::vector<double>>("position.M1", {1.0, 1.0, 1.0});
-  this->declare_parameter<std::vector<double>>("position.K1", {1.0, 1.0, 1.0});
-  this->declare_parameter<std::vector<double>>("position.M2", {1.0, 1.0, 1.0});
+  this->declare_parameter<std::vector<double>>("position.K1", {1.5, 1.5, 1.5});
+  this->declare_parameter<std::vector<double>>("position.M2", {3.0, 3.0, 3.0});
   this->declare_parameter<std::vector<double>>("position.K2", {1.0, 1.0, 1.0});
+  this->declare_parameter<double>("position.max_tilt_deg", 35.0);
   this->declare_parameter<std::vector<double>>("position.observer.Pv", {0.0, 0.0, 0.0});
   this->declare_parameter<std::vector<double>>("position.observer.Lv", {5.0, 5.0, 5.0});
 
   // 姿态环参数
-  this->declare_parameter<std::vector<double>>("attitude.M_theta", {1.0, 1.0, 1.0});
-  this->declare_parameter<std::vector<double>>("attitude.K_theta", {1.0, 1.0, 1.0});
-  this->declare_parameter<std::vector<double>>("attitude.M_omega", {1.0, 1.0, 1.0});
-  this->declare_parameter<std::vector<double>>("attitude.K_omega", {1.0, 1.0, 1.0});
+  this->declare_parameter<std::vector<double>>("attitude.M_theta", {3.0, 3.0, 3.0});
+  this->declare_parameter<std::vector<double>>("attitude.K_theta", {4.0, 4.0, 4.0});
+  this->declare_parameter<std::vector<double>>("attitude.M_omega", {20.0, 20.0, 15.0});
+  this->declare_parameter<std::vector<double>>("attitude.K_omega", {2.0, 2.0, 2.0});
   this->declare_parameter<std::vector<double>>("attitude.observer.P_omega", {0.0, 0.0, 0.0});
   this->declare_parameter<std::vector<double>>("attitude.observer.L_omega", {5.0, 5.0, 5.0});
 
@@ -127,6 +128,11 @@ void TanhControllerNode::loadParams()
   pg.Pv = getVec3Param(*this, "position.observer.Pv");
   pg.Lv = getVec3Param(*this, "position.observer.Lv");
   controller_.setPositionGains(pg);
+
+  {
+    const double max_tilt_deg = this->get_parameter("position.max_tilt_deg").as_double();
+    controller_.setMaxTilt(max_tilt_deg * M_PI / 180.0);
+  }
 
   AttitudeGains ag;
   ag.M_theta = getVec3Param(*this, "attitude.M_theta");
@@ -270,6 +276,32 @@ void TanhControllerNode::setpointCallback(const px4_msgs::msg::TrajectorySetpoin
 
   ref_.position_ned = Eigen::Vector3d(x, y, z);
   ref_.yaw = std::isfinite(yaw) ? static_cast<double>(yaw) : 0.0;
+
+  const float vx = msg->velocity[0];
+  const float vy = msg->velocity[1];
+  const float vz = msg->velocity[2];
+  if (std::isfinite(vx) && std::isfinite(vy) && std::isfinite(vz)) {
+    ref_.velocity_ned = Eigen::Vector3d(vx, vy, vz);
+    ref_.has_velocity = true;
+  } else {
+    ref_.velocity_ned.setZero();
+    ref_.has_velocity = false;
+  }
+
+  const float ax = msg->acceleration[0];
+  const float ay = msg->acceleration[1];
+  const float az = msg->acceleration[2];
+  if (std::isfinite(ax) && std::isfinite(ay) && std::isfinite(az)) {
+    ref_.acceleration_ned = Eigen::Vector3d(ax, ay, az);
+    ref_.has_acceleration = true;
+  } else {
+    ref_.acceleration_ned.setZero();
+    ref_.has_acceleration = false;
+  }
+
+  const float yawspeed = msg->yawspeed;
+  ref_.yawspeed = std::isfinite(yawspeed) ? static_cast<double>(yawspeed) : 0.0;
+
   ref_.valid = true;
   has_ref_ = true;
 }

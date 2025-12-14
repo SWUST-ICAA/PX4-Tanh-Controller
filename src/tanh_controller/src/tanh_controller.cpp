@@ -50,6 +50,17 @@ void TanhController::setMotorForceMax(double max_force)
   motor_force_max_ = std::max(1e-3, max_force);
 }
 
+void TanhController::setMaxTilt(double max_tilt_rad)
+{
+  // 位置环最大倾角限制（0/负数表示不限制）
+  if (!std::isfinite(max_tilt_rad) || max_tilt_rad <= 0.0) {
+    max_tilt_rad_ = 0.0;
+    return;
+  }
+  // 限制到(0, pi/2)之间，避免tan发散
+  max_tilt_rad_ = std::clamp(max_tilt_rad, 1e-3, (M_PI_2 - 1e-3));
+}
+
 void TanhController::reset()
 {
   // 重置观测器内部状态
@@ -142,9 +153,12 @@ void TanhController::computePosition(
   // 位置误差 e_xi = xi - xi_d
   Eigen::Vector3d e_xi = state.position_ned - ref.position_ned;
 
-  // 速度误差 e_v = v + M1*tanh(K1*e_xi)
+  const Eigen::Vector3d v_d = ref.has_velocity ? ref.velocity_ned : Eigen::Vector3d::Zero();
+  const Eigen::Vector3d a_d = ref.has_acceleration ? ref.acceleration_ned : Eigen::Vector3d::Zero();
+
+  // 速度误差 e_v = (v - v_d) + M1*tanh(K1*e_xi)
   Eigen::Vector3d tanh_exi = tanhVec(pos_gains_.K1.cwiseProduct(e_xi));
-  Eigen::Vector3d e_v = state.velocity_ned + pos_gains_.M1.cwiseProduct(tanh_exi);
+  Eigen::Vector3d e_v = (state.velocity_ned - v_d) + pos_gains_.M1.cwiseProduct(tanh_exi);
 
   // 观测误差 epsilon_v = e_v - e_hat_v
   Eigen::Vector3d epsilon_v = e_v - e_hat_v_;
@@ -153,12 +167,29 @@ void TanhController::computePosition(
 
   Eigen::Vector3d g_ned(0.0, 0.0, gravity_);
 
-  // 推力矢量 T_d*z_B,d = m*(mu_v + g + M2*tanh(K2*e_v))
+  // 推力矢量 T_d*z_B,d = m*(mu_v + g - a_d + M2*tanh(K2*e_v))
   Eigen::Vector3d tanh_ev = tanhVec(pos_gains_.K2.cwiseProduct(e_v));
-  Eigen::Vector3d thrust_vec = mass_ * (mu_v + g_ned + pos_gains_.M2.cwiseProduct(tanh_ev));
+  Eigen::Vector3d v = mu_v + g_ned - a_d + pos_gains_.M2.cwiseProduct(tanh_ev);  // thrust_vec/m
+
+  // 限制最大倾角：约束 ||v_xy|| <= v_z * tan(max_tilt)
+  if (max_tilt_rad_ > 0.0) {
+    // 避免出现需要倒飞(v_z<=0)的情况
+    v.z() = std::max(v.z(), 1e-3);
+
+    const double horiz = std::hypot(v.x(), v.y());
+    const double max_horiz = v.z() * std::tan(max_tilt_rad_);
+    if (horiz > max_horiz && horiz > 1e-9) {
+      const double scale = max_horiz / horiz;
+      v.x() *= scale;
+      v.y() *= scale;
+    }
+  }
+
+  Eigen::Vector3d thrust_vec = mass_ * v;
 
   // 更新速度扰动观测器(13)
-  Eigen::Vector3d dot_e_hat_v = (-thrust_vec / mass_) + g_ned + mu_v;
+  // 对跟踪情形补偿a_d，使得在无扰动时仍有 dot(e_hat_v) ≈ -M2*tanh(K2*e_v)
+  Eigen::Vector3d dot_e_hat_v = (-thrust_vec / mass_) + g_ned - a_d + mu_v;
   e_hat_v_ += dt * dot_e_hat_v;
 
   if (thrust_vec_ned) {
