@@ -9,6 +9,7 @@
 #include <px4_msgs/msg/trajectory_setpoint.hpp>
 #include <px4_msgs/msg/vehicle_command.hpp>
 #include <px4_msgs/msg/vehicle_odometry.hpp>
+#include <px4_msgs/msg/vehicle_thrust_setpoint.hpp>
 
 #include "tanh_controller/tanh_controller.hpp"
 
@@ -50,6 +51,7 @@ private:
   rclcpp::Publisher<px4_msgs::msg::ActuatorMotors>::SharedPtr motors_pub_;
   rclcpp::Publisher<px4_msgs::msg::OffboardControlMode>::SharedPtr offboard_mode_pub_;
   rclcpp::Publisher<px4_msgs::msg::VehicleCommand>::SharedPtr vehicle_command_pub_;
+  rclcpp::Publisher<px4_msgs::msg::VehicleThrustSetpoint>::SharedPtr thrust_sp_pub_;
 
   rclcpp::TimerBase::SharedPtr timer_;
 
@@ -71,9 +73,12 @@ private:
   std::string topic_actuator_motors_;
   std::string topic_offboard_control_mode_;
   std::string topic_vehicle_command_;
+  std::string topic_vehicle_thrust_setpoint_;
 
   double control_rate_hz_{100.0};
   bool publish_offboard_control_mode_{true};
+  bool publish_vehicle_thrust_setpoint_{true};
+  double motor_force_max_{8.54858};
 
   // 电机输出顺序映射：out[i] = internal[motor_output_map_[i]]
   // internal顺序来自G1列顺序（默认：前左、前右、后右、后左）

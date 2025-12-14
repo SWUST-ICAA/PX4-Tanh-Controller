@@ -22,10 +22,13 @@ TanhControllerNode::TanhControllerNode(const rclcpp::NodeOptions & options)
   this->declare_parameter<std::string>(
     "topics.offboard_control_mode", "/fmu/in/offboard_control_mode");
   this->declare_parameter<std::string>("topics.vehicle_command", "/fmu/in/vehicle_command");
+  this->declare_parameter<std::string>(
+    "topics.vehicle_thrust_setpoint", "/fmu/in/vehicle_thrust_setpoint");
 
   // 行为参数
   this->declare_parameter<double>("control_rate_hz", 100.0);
   this->declare_parameter<bool>("publish_offboard_control_mode", true);
+  this->declare_parameter<bool>("publish_vehicle_thrust_setpoint", true);
   this->declare_parameter<bool>("auto_offboard", false);
   this->declare_parameter<bool>("auto_arm", false);
   this->declare_parameter<int>("offboard_warmup", 10);
@@ -81,6 +84,8 @@ TanhControllerNode::TanhControllerNode(const rclcpp::NodeOptions & options)
     this->create_publisher<px4_msgs::msg::OffboardControlMode>(topic_offboard_control_mode_, qos_default);
   vehicle_command_pub_ =
     this->create_publisher<px4_msgs::msg::VehicleCommand>(topic_vehicle_command_, qos_default);
+  thrust_sp_pub_ = this->create_publisher<px4_msgs::msg::VehicleThrustSetpoint>(
+    topic_vehicle_thrust_setpoint_, qos_default);
 
   const auto period = std::chrono::duration<double>(1.0 / std::max(1.0, control_rate_hz_));
   timer_ = this->create_wall_timer(
@@ -96,9 +101,11 @@ void TanhControllerNode::loadParams()
   topic_actuator_motors_ = this->get_parameter("topics.actuator_motors").as_string();
   topic_offboard_control_mode_ = this->get_parameter("topics.offboard_control_mode").as_string();
   topic_vehicle_command_ = this->get_parameter("topics.vehicle_command").as_string();
+  topic_vehicle_thrust_setpoint_ = this->get_parameter("topics.vehicle_thrust_setpoint").as_string();
 
   control_rate_hz_ = this->get_parameter("control_rate_hz").as_double();
   publish_offboard_control_mode_ = this->get_parameter("publish_offboard_control_mode").as_bool();
+  publish_vehicle_thrust_setpoint_ = this->get_parameter("publish_vehicle_thrust_setpoint").as_bool();
   enable_auto_offboard_ = this->get_parameter("auto_offboard").as_bool();
   enable_auto_arm_ = this->get_parameter("auto_arm").as_bool();
   offboard_setpoint_warmup_ = this->get_parameter("offboard_warmup").as_int();
@@ -149,7 +156,8 @@ void TanhControllerNode::loadParams()
   ap.cq_ct = this->get_parameter("allocation.cq_ct").as_double();
   controller_.setAllocationParams(ap);
 
-  controller_.setMotorForceMax(this->get_parameter("motor.force_max").as_double());
+  motor_force_max_ = this->get_parameter("motor.force_max").as_double();
+  controller_.setMotorForceMax(motor_force_max_);
 
   {
     const auto map = this->get_parameter("motor.output_map").as_integer_array();
@@ -393,6 +401,24 @@ void TanhControllerNode::controlLoop()
   }
 
   motors_pub_->publish(motors);
+
+  // PX4 land detector使用vehicle_thrust_setpoint判断“低油门/落地”状态。
+  // 在direct_actuator模式下如果不发布该topic，它可能长期认为油门=0，从而误判落地并自动上锁。
+  if (publish_vehicle_thrust_setpoint_ && thrust_sp_pub_) {
+    px4_msgs::msg::VehicleThrustSetpoint thrust_sp{};
+    thrust_sp.timestamp = now_us;
+    thrust_sp.timestamp_sample = now_us;
+
+    double throttle = 0.0;
+    const double denom = 4.0 * std::max(1e-6, motor_force_max_);
+    if (std::isfinite(out.thrust_total)) {
+      throttle = std::clamp(out.thrust_total / denom, 0.0, 1.0);
+    }
+
+    // 多旋翼推力沿机体系-FRD的-z方向（向上），因此z为负。
+    thrust_sp.xyz = {0.0f, 0.0f, static_cast<float>(-throttle)};
+    thrust_sp_pub_->publish(thrust_sp);
+  }
 }
 
 }  // namespace tanh_controller

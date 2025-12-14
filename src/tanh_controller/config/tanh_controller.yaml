@@ -6,9 +6,11 @@ tanh_controller:
       actuator_motors: /fmu/in/actuator_motors
       offboard_control_mode: /fmu/in/offboard_control_mode
       vehicle_command: /fmu/in/vehicle_command
+      vehicle_thrust_setpoint: /fmu/in/vehicle_thrust_setpoint
 
-    control_rate_hz: 1000.0
+    control_rate_hz: 2000.0
     publish_offboard_control_mode: true
+    publish_vehicle_thrust_setpoint: true
     auto_offboard: true
     auto_arm: true
     offboard_warmup: 10
@@ -20,22 +22,22 @@ tanh_controller:
 
     position:
       M1: [2.0, 2.0, 2.0]
-      K1: [0.5, 0.5, 0.5]
-      M2: [4.0, 4.0, 4.0]
+      K1: [0.5, 0.5, 5.0]
+      M2: [6.0, 6.0, 6.0]
       K2: [1.0, 1.0, 1.0]
       max_tilt_deg: 35.0
       observer:
-        Pv: [0.0, 0.0, 0.0]
-        Lv: [5.0, 5.0, 5.0]
+        Pv: [0.1, 0.1, 0.1]
+        Lv: [1.0, 1.0, 1.0]
 
     attitude:
       M_theta: [2.0, 2.0, 2.0]
-      K_theta: [3.0, 3.0, 3.0]
-      M_omega: [5.0, 5.0, 5.0]
-      K_omega: [8.0, 8.0, 8.0]
+      K_theta: [5.0, 5.0, 5.0]
+      M_omega: [25.0, 25.0, 10.0]
+      K_omega: [1.2, 1.2, 1.0]
       observer:
-        P_omega: [0.0, 0.0, 0.0]
-        L_omega: [5.0, 5.0, 5.0]
+        P_omega: [0.1, 0.1, 0.1]
+        L_omega: [1.0, 1.0, 1.0]
 
     allocation:
       l: 0.246073

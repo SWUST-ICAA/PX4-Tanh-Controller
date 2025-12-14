@@ -9,8 +9,8 @@ def generate_launch_description():
     tanh_share = get_package_share_directory('tanh_controller')
     fig8_share = get_package_share_directory('figure8_path_publisher')
 
-    tanh_params = os.path.join(tanh_share, 'config', 'tanh_controller.yaml')
-    fig8_params = os.path.join(fig8_share, 'config', 'figure8_path_publisher.yaml')
+    tanh_params = 'src/tanh_controller/config/tanh_controller.yaml'
+    fig8_params ='src/figure8_path_publisher/config/figure8_path_publisher.yaml'
 
     return LaunchDescription([
         Node(
@@ -28,4 +28,3 @@ def generate_launch_description():
             parameters=[tanh_params],
         )
     ])
-
