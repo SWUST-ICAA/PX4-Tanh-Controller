@@ -82,7 +82,14 @@ Eigen::Vector3d TanhController::tanhVec(const Eigen::Vector3d & x)
 bool TanhController::compute(
   const VehicleState & state, const TrajectoryRef & ref, double dt, ControlOutput * out)
 {
-  // 根据状态与参考计算电机归一化推力（0..1）
+  // 根据状态与参考计算控制输出（总推力+力矩），并做电机分配得到归一化推力（0..1）
+  //
+  // 主要步骤：
+  // 1) 位置环得到推力矢量：T_d z_B,d（NED）
+  // 2) 推力方向单位化：z_B,d = (T_d z_B,d) / ||T_d z_B,d||
+  // 3) 推力矢量分解得到期望姿态：q_d = f(z_B,d, yaw_d)
+  // 4) 姿态环得到期望力矩：tau_d（FRD）
+  // 5) 控制分配得到单电机推力：G1 f = [T_d, tau_d]^T
   if (!out || !ref.valid) {
     return false;
   }
@@ -128,7 +135,12 @@ Eigen::Quaterniond TanhController::computeDesiredAttitude(
   const Eigen::Vector3d & z_b_d_ned, double yaw_d) const
 {
   // 推力矢量分解：由z轴期望方向+航向角构造期望姿态
-  // 根据推导式(19)-(22)构造期望机体系三个轴
+  // 期望机体系轴（NED）：
+  // z_B,d = z_b_d_ned / ||z_b_d_ned||
+  // x_C,d = [cos(yaw_d), sin(yaw_d), 0]^T
+  // y_B,d = (z_B,d × x_C,d) / ||z_B,d × x_C,d||
+  // x_B,d = y_B,d × z_B,d
+  // R_d   = [x_B,d, y_B,d, z_B,d]
   Eigen::Vector3d z_b = z_b_d_ned.normalized();
   Eigen::Vector3d x_c(std::cos(yaw_d), std::sin(yaw_d), 0.0);
 
@@ -158,7 +170,21 @@ void TanhController::computePosition(
   Eigen::Vector3d * thrust_vec_ned, double * thrust_norm)
 {
   // 位置环：计算期望推力矢量，并更新速度扰动观测器
-  // 位置误差 position_error = position - position_ref
+  //
+  // 误差与中间量（NED）：
+  // e_xi = xi - xi_d
+  // e_v  = dot(xi) + M_xi ⊙ tanh(K_xi ⊙ e_xi)
+  // ε_v  = e_v - ê_v
+  // μ_v  = P_v ⊙ tanh(L_v ⊙ ε_v)
+  //
+  // 加速度项：ddot(xi) 由速度差分估计
+  // ddot(xi) ≈ (v_k - v_{k-1}) / dt
+  //
+  // 推力矢量控制律（NED）：
+  // (T_d z_B,d)/m = μ_v + g + M_v ⊙ tanh(K_v ⊙ e_v) + K_a ⊙ ddot(xi)
+  //
+  // 速度扰动观测器：
+  // ê̇_v = -(T_d z_B,d)/m + g + μ_v
   const Eigen::Vector3d position_error_ned = state.position_ned - ref.position_ned;
 
   Eigen::Vector3d linear_acceleration_ned = Eigen::Vector3d::Zero();
@@ -169,7 +195,7 @@ void TanhController::computePosition(
     linear_acceleration_ned.setZero();
   }
 
-  // 速度误差 e_v = dot(xi) + M_xi*tanh(K_xi*e_xi) (11)（不使用速度/加速度前馈）
+  // 速度误差 e_v
   const Eigen::Vector3d tanh_position_error =
     tanhVec(pos_gains_.K_P.cwiseProduct(position_error_ned));
   const Eigen::Vector3d velocity_error_ned =
@@ -184,7 +210,7 @@ void TanhController::computePosition(
 
   Eigen::Vector3d g_ned(0.0, 0.0, gravity_);
 
-  // 推力矢量 (12): T_d*z_B,d = m*(mu_v + g + M_v*tanh(K_v*e_v) + K_a*ddot(xi))
+  // 推力矢量：T_d z_B,d
   const Eigen::Vector3d tanh_velocity_error =
     tanhVec(pos_gains_.K_V.cwiseProduct(velocity_error_ned));
   Eigen::Vector3d thrust_vector_over_mass_ned =
@@ -209,7 +235,7 @@ void TanhController::computePosition(
 
   const Eigen::Vector3d desired_thrust_vector_ned = mass_ * thrust_vector_over_mass_ned;
 
-  // 更新速度扰动观测器(13)
+  // 更新速度扰动观测器 ê_v
   const Eigen::Vector3d velocity_error_hat_dot_ned =
     (-desired_thrust_vector_ned / mass_) + g_ned + velocity_disturbance_estimate_ned;
   velocity_error_hat_ned_ += dt * velocity_error_hat_dot_ned;
@@ -229,6 +255,27 @@ void TanhController::computeAttitude(
   Eigen::Vector3d * torque_body)
 {
   // 姿态环：计算期望力矩，并更新角速度扰动观测器
+  //
+  // 四元数误差：
+  // q_e' = q_d^{-1} ⊗ q
+  // q_e  = sgn(q_e,w') * q_e'
+  // e_theta = vec(q_e)
+  //
+  // 角速度误差与扰动观测（FRD）：
+  // e_Omega = Omega + M_theta ⊙ tanh(K_theta ⊙ e_theta)
+  // ε_Omega = e_Omega - ê_Omega
+  // μ_Omega = P_Omega ⊙ tanh(L_Omega ⊙ ε_Omega)
+  //
+  // 角加速度项：dot(Omega) 由角速度差分估计
+  // dot(Omega) ≈ (Omega_k - Omega_{k-1}) / dt
+  //
+  // 力矩控制律（FRD）：
+  // tau_d = Omega × (I Omega) - I μ_Omega
+  //         - I (M_Omega ⊙ tanh(K_Omega ⊙ e_Omega))
+  //         - I (K_alpha ⊙ dot(Omega))
+  //
+  // 角速度误差观测器（显式更新）：
+  // ê̇_Omega = -I^{-1} (Omega × (I Omega)) + I^{-1} tau_d + μ_Omega
   const Eigen::Quaterniond q = state.q_body_to_ned.normalized();
 
   Eigen::Vector3d angular_acceleration_body = Eigen::Vector3d::Zero();
@@ -239,17 +286,16 @@ void TanhController::computeAttitude(
     angular_acceleration_body.setZero();
   }
 
-  // 四元数误差：使用“当前相对期望”的误差(与position_error=position-position_ref一致)
-  // q_error = q_d^{-1} ⊗ q，对应 R_error = R_d^T * R
+  // 四元数误差：q_e' = q_d^{-1} ⊗ q（对应 R_e = R_d^T R）
   Eigen::Quaterniond q_error = q_d.conjugate() * q;
   if (q_error.w() < 0.0) {
     q_error.coeffs() *= -1.0;
   }
 
-  // 姿态误差向量：取虚部(误差轴角信息)
+  // 姿态误差向量：e_theta = vec(q_e)
   const Eigen::Vector3d attitude_error = q_error.vec();
 
-  // 角速度误差：angular_velocity_error = Ω + M_Angle*tanh(K_Angle*attitude_error)
+  // 角速度误差：e_Omega
   const Eigen::Vector3d tanh_attitude_error =
     tanhVec(att_gains_.K_Angle.cwiseProduct(attitude_error));
   const Eigen::Vector3d angular_velocity_error_body =
@@ -267,7 +313,7 @@ void TanhController::computeAttitude(
     angular_velocity_body.cross(inertia_ * angular_velocity_body);
   const Eigen::Matrix3d inertia_inv = inertia_.inverse();
 
-  // 力矩控制律(31)
+  // 力矩控制律：tau_d
   const Eigen::Vector3d tanh_angular_velocity_error =
     tanhVec(att_gains_.K_AngularVelocity.cwiseProduct(angular_velocity_error_body));
   const Eigen::Vector3d angular_velocity_control_term =
@@ -277,7 +323,7 @@ void TanhController::computeAttitude(
     inertia_ * angular_velocity_control_term -
     inertia_ * att_gains_.K_AngularAcceleration.cwiseProduct(angular_acceleration_body);
 
-  // 更新姿态扰动观测器(27)（按推导简化）
+  // 更新角速度误差观测器 ê_Omega
   const Eigen::Vector3d angular_velocity_error_hat_dot_body =
     (-inertia_inv * omega_cross_Iomega) + inertia_inv * desired_torque_body +
     angular_velocity_disturbance_estimate_body;
@@ -294,6 +340,7 @@ Eigen::Vector4d TanhController::allocateMotors(
   double thrust_total, const Eigen::Vector3d & torque_body) const
 {
   // 控制分配：由(T,τ)求解单电机推力（对应推导中的G1）
+  // [T, tau_x, tau_y, tau_z]^T = G1 * f，求解 f = G1^{-1} * wrench
   // 注意：电机推力存在上下限(0..motor_force_max_)，若不做限幅会导致求解结果出现负推力，
   // 进而出现“部分电机0/部分电机满油门”，总推力反而不足（表现为解锁但起不来）。
   const double f_max = motor_force_max_;

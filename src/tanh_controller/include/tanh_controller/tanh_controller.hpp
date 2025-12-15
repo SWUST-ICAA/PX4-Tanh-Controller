@@ -20,9 +20,9 @@ struct VehicleState
  */
 struct TrajectoryRef
 {
-  Eigen::Vector3d position_ned{Eigen::Vector3d::Zero()}; ///< 期望位置 [m]
-  double yaw{0.0};                                       ///< 期望航向角 [rad]
-  bool valid{false};                                    ///< 是否有效
+  Eigen::Vector3d position_ned{Eigen::Vector3d::Zero()};  ///< 期望位置 [m]
+  double yaw{0.0};                                        ///< 期望航向角 [rad]
+  bool valid{false};                                      ///< 是否有效
 };
 
 /**

@@ -275,7 +275,7 @@ void TanhControllerNode::odomCallback(const px4_msgs::msg::VehicleOdometry::Shar
 
 void TanhControllerNode::setpointCallback(const px4_msgs::msg::TrajectorySetpoint::SharedPtr msg)
 {
-  // 接收期望轨迹点（位置+航向）
+  // 接收期望轨迹点：控制器位置环使用 xi_d（期望位置）与 yaw_d（期望航向角）来构造推力方向与期望姿态
   if (!msg) {
     return;
   }
