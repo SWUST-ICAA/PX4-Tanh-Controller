@@ -219,8 +219,9 @@ void TanhController::computeAttitude(
   // 姿态环：计算期望力矩，并更新角速度扰动观测器
   const Eigen::Quaterniond q = state.q_body_to_ned.normalized();
 
-  // (23)(24) 四元数误差：q_e = sgn(q_ew') * (q^{-1} ⊗ q_d)
-  Eigen::Quaterniond q_error = q.conjugate() * q_d;
+  // 四元数误差：使用“当前相对期望”的误差(与position_error=position-position_ref一致)
+  // q_error = q_d^{-1} ⊗ q，对应 R_error = R_d^T * R
+  Eigen::Quaterniond q_error = q_d.conjugate() * q;
   if (q_error.w() < 0.0) {
     q_error.coeffs() *= -1.0;
   }
