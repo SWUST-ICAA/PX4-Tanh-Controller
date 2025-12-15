@@ -27,7 +27,7 @@ figure8_path_publisher:
       enable: true
       target_z: -2.0         # NED: 向上为负；建议与trajectory.center[2]保持一致，避免切换跳变
       z_threshold: 0.2
-      hover_time_s: 1.0
+      hover_time_s: 5.0
       timeout_s: 0.0         # <=0表示不超时
 
     trajectory:

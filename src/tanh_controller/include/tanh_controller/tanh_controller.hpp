@@ -39,6 +39,7 @@ struct PositionGains
   Eigen::Vector3d K_P{Eigen::Vector3d::Ones()};
   Eigen::Vector3d M_V{Eigen::Vector3d::Ones()};
   Eigen::Vector3d K_V{Eigen::Vector3d::Ones()};
+  Eigen::Vector3d K_Acceleration{Eigen::Vector3d::Zero()};
   Eigen::Vector3d P_V{Eigen::Vector3d::Zero()};
   Eigen::Vector3d L_V{Eigen::Vector3d::Ones()};
 };
@@ -52,6 +53,7 @@ struct AttitudeGains
   Eigen::Vector3d K_Angle{Eigen::Vector3d::Ones()};
   Eigen::Vector3d M_AngularVelocity{Eigen::Vector3d::Ones()};
   Eigen::Vector3d K_AngularVelocity{Eigen::Vector3d::Ones()};
+  Eigen::Vector3d K_AngularAcceleration{Eigen::Vector3d::Zero()};
   Eigen::Vector3d P_AngularVelocity{Eigen::Vector3d::Zero()};
   Eigen::Vector3d L_AngularVelocity{Eigen::Vector3d::Ones()};
 };
@@ -159,6 +161,10 @@ private:
 
   Eigen::Vector3d velocity_error_hat_ned_{Eigen::Vector3d::Zero()};  ///< 速度误差观测器状态(NED)
   Eigen::Vector3d angular_velocity_error_hat_body_{Eigen::Vector3d::Zero()};  ///< 角速度误差观测器状态(FRD)
+  Eigen::Vector3d last_velocity_ned_{Eigen::Vector3d::Zero()};
+  Eigen::Vector3d last_angular_velocity_body_{Eigen::Vector3d::Zero()};
+  bool has_last_velocity_{false};
+  bool has_last_angular_velocity_{false};
   bool first_run_{true};
 };
 

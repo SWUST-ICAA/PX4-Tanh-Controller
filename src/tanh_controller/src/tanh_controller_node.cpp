@@ -44,6 +44,7 @@ TanhControllerNode::TanhControllerNode(const rclcpp::NodeOptions & options)
   this->declare_parameter<std::vector<double>>("position.K_P", {1.5, 1.5, 1.5});
   this->declare_parameter<std::vector<double>>("position.M_V", {3.0, 3.0, 3.0});
   this->declare_parameter<std::vector<double>>("position.K_V", {1.0, 1.0, 1.0});
+  this->declare_parameter<std::vector<double>>("position.K_Acceleration", {0.0, 0.0, 0.0});
   this->declare_parameter<double>("position.max_tilt_deg", 35.0);
   this->declare_parameter<std::vector<double>>("position.observer.P_V", {0.0, 0.0, 0.0});
   this->declare_parameter<std::vector<double>>("position.observer.L_V", {5.0, 5.0, 5.0});
@@ -55,6 +56,8 @@ TanhControllerNode::TanhControllerNode(const rclcpp::NodeOptions & options)
     "attitude.M_AngularVelocity", {20.0, 20.0, 15.0});
   this->declare_parameter<std::vector<double>>(
     "attitude.K_AngularVelocity", {2.0, 2.0, 2.0});
+  this->declare_parameter<std::vector<double>>(
+    "attitude.K_AngularAcceleration", {0.0, 0.0, 0.0});
   this->declare_parameter<std::vector<double>>(
     "attitude.observer.P_AngularVelocity", {0.0, 0.0, 0.0});
   this->declare_parameter<std::vector<double>>(
@@ -136,6 +139,7 @@ void TanhControllerNode::loadParams()
   pg.K_P = getVec3Param(*this, "position.K_P");
   pg.M_V = getVec3Param(*this, "position.M_V");
   pg.K_V = getVec3Param(*this, "position.K_V");
+  pg.K_Acceleration = getVec3Param(*this, "position.K_Acceleration");
   pg.P_V = getVec3Param(*this, "position.observer.P_V");
   pg.L_V = getVec3Param(*this, "position.observer.L_V");
   controller_.setPositionGains(pg);
@@ -150,6 +154,7 @@ void TanhControllerNode::loadParams()
   ag.K_Angle = getVec3Param(*this, "attitude.K_Angle");
   ag.M_AngularVelocity = getVec3Param(*this, "attitude.M_AngularVelocity");
   ag.K_AngularVelocity = getVec3Param(*this, "attitude.K_AngularVelocity");
+  ag.K_AngularAcceleration = getVec3Param(*this, "attitude.K_AngularAcceleration");
   ag.P_AngularVelocity = getVec3Param(*this, "attitude.observer.P_AngularVelocity");
   ag.L_AngularVelocity = getVec3Param(*this, "attitude.observer.L_AngularVelocity");
   controller_.setAttitudeGains(ag);

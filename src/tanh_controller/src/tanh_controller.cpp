@@ -66,6 +66,10 @@ void TanhController::reset()
   // 重置观测器内部状态
   velocity_error_hat_ned_.setZero();
   angular_velocity_error_hat_body_.setZero();
+  last_velocity_ned_.setZero();
+  last_angular_velocity_body_.setZero();
+  has_last_velocity_ = false;
+  has_last_angular_velocity_ = false;
   first_run_ = true;
 }
 
@@ -87,6 +91,10 @@ bool TanhController::compute(
     // 首次运行时清零观测器，避免历史残留
     velocity_error_hat_ned_.setZero();
     angular_velocity_error_hat_body_.setZero();
+    last_velocity_ned_ = state.velocity_ned;
+    last_angular_velocity_body_ = state.angular_velocity_body;
+    has_last_velocity_ = true;
+    has_last_angular_velocity_ = true;
     first_run_ = false;
   }
 
@@ -158,6 +166,15 @@ void TanhController::computePosition(
   const Eigen::Vector3d acceleration_ref_ned =
     ref.has_acceleration ? ref.acceleration_ned : Eigen::Vector3d::Zero();
 
+  Eigen::Vector3d linear_acceleration_ned = Eigen::Vector3d::Zero();
+  if (has_last_velocity_) {
+    linear_acceleration_ned = (state.velocity_ned - last_velocity_ned_) / dt;
+  }
+  if (!linear_acceleration_ned.allFinite()) {
+    linear_acceleration_ned.setZero();
+  }
+  const Eigen::Vector3d linear_acceleration_error_ned = linear_acceleration_ned - acceleration_ref_ned;
+
   // 速度误差 velocity_error = (velocity - velocity_ref) + M_P*tanh(K_P*position_error)
   const Eigen::Vector3d tanh_position_error =
     tanhVec(pos_gains_.K_P.cwiseProduct(position_error_ned));
@@ -178,7 +195,8 @@ void TanhController::computePosition(
     tanhVec(pos_gains_.K_V.cwiseProduct(velocity_error_ned));
   Eigen::Vector3d thrust_vector_over_mass_ned =
     velocity_disturbance_estimate_ned + g_ned - acceleration_ref_ned +
-    pos_gains_.M_V.cwiseProduct(tanh_velocity_error);  // (T_d*z_B,d)/m
+    pos_gains_.M_V.cwiseProduct(tanh_velocity_error) +
+    pos_gains_.K_Acceleration.cwiseProduct(linear_acceleration_error_ned);  // (T_d*z_B,d)/m
 
   // 限制最大倾角：约束 ||v_xy|| <= v_z * tan(max_tilt)
   if (max_tilt_rad_ > 0.0) {
@@ -203,6 +221,8 @@ void TanhController::computePosition(
     (-desired_thrust_vector_ned / mass_) + g_ned - acceleration_ref_ned +
     velocity_disturbance_estimate_ned;
   velocity_error_hat_ned_ += dt * velocity_error_hat_dot_ned;
+  last_velocity_ned_ = state.velocity_ned;
+  has_last_velocity_ = true;
 
   if (thrust_vec_ned) {
     *thrust_vec_ned = desired_thrust_vector_ned;
@@ -218,6 +238,14 @@ void TanhController::computeAttitude(
 {
   // 姿态环：计算期望力矩，并更新角速度扰动观测器
   const Eigen::Quaterniond q = state.q_body_to_ned.normalized();
+
+  Eigen::Vector3d angular_acceleration_body = Eigen::Vector3d::Zero();
+  if (has_last_angular_velocity_) {
+    angular_acceleration_body = (state.angular_velocity_body - last_angular_velocity_body_) / dt;
+  }
+  if (!angular_acceleration_body.allFinite()) {
+    angular_acceleration_body.setZero();
+  }
 
   // 四元数误差：使用“当前相对期望”的误差(与position_error=position-position_ref一致)
   // q_error = q_d^{-1} ⊗ q，对应 R_error = R_d^T * R
@@ -254,13 +282,16 @@ void TanhController::computeAttitude(
     att_gains_.M_AngularVelocity.cwiseProduct(tanh_angular_velocity_error);
   const Eigen::Vector3d desired_torque_body =
     omega_cross_Iomega - inertia_ * angular_velocity_disturbance_estimate_body -
-    inertia_ * angular_velocity_control_term;
+    inertia_ * angular_velocity_control_term -
+    inertia_ * att_gains_.K_AngularAcceleration.cwiseProduct(angular_acceleration_body);
 
   // 更新姿态扰动观测器(27)（按推导简化）
   const Eigen::Vector3d angular_velocity_error_hat_dot_body =
     (-inertia_inv * omega_cross_Iomega) + inertia_inv * desired_torque_body +
     angular_velocity_disturbance_estimate_body;
   angular_velocity_error_hat_body_ += dt * angular_velocity_error_hat_dot_body;
+  last_angular_velocity_body_ = state.angular_velocity_body;
+  has_last_angular_velocity_ = true;
 
   if (torque_body) {
     *torque_body = desired_torque_body;
