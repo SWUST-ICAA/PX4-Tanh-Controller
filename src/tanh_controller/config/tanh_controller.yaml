@@ -8,7 +8,7 @@ tanh_controller:
       vehicle_command: /fmu/in/vehicle_command
       vehicle_thrust_setpoint: /fmu/in/vehicle_thrust_setpoint
 
-    control_rate_hz: 2000.0
+    control_rate_hz: 1000.0
     publish_offboard_control_mode: true
     publish_vehicle_thrust_setpoint: true
     auto_offboard: true
@@ -22,24 +22,24 @@ tanh_controller:
 
     position:
       M_P: [2.0, 2.0, 2.0]
-      K_P: [1.5, 1.5, 3.0]
-      M_V: [5.0, 5.0, 5.0]
+      K_P: [1.0, 1.0, 1.0]
+      M_V: [6.0, 6.0, 6.0]
       K_V: [0.5, 0.5, 0.5]
-      K_Acceleration: [1.0, 1.0, 4.2]
+      K_Acceleration: [1.0, 1.0, 1.0]
       max_tilt_deg: 35.0
       observer:
-        P_V: [0.1, 0.1, 3.0]
-        L_V: [2.0, 2.0, 3.0]
+        P_V: [0.0, 0.0, 0.0]
+        L_V: [0.0, 0.0, 0.0]
 
     attitude:
-      M_Angle: [1.5, 1.5, 1.0]
-      K_Angle: [8.0, 8.0, 4.0]
-      M_AngularVelocity: [5.0, 5.0, 5.0]
-      K_AngularVelocity: [6.2, 6.2, 5.2]
-      K_AngularAcceleration: [4.3, 4.3, 0.0]
+      M_Angle: [2.0, 2.0, 1.0]
+      K_Angle: [5.0, 5.0, 8.0]
+      M_AngularVelocity: [6.0, 6.0, 8.0]
+      K_AngularVelocity: [4.0, 4.0, 4.0]
+      K_AngularAcceleration: [0.7, 0.7, 1.0]
       observer:
-        P_AngularVelocity: [0.1, 0.1, 0.0]
-        L_AngularVelocity: [1.0, 1.0, 1.0]
+        P_AngularVelocity: [0.2, 0.2, 0.2]
+        L_AngularVelocity: [0.5, 0.5, 0.5]
 
     allocation:
       l: 0.246073
