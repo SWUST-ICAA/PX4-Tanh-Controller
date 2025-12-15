@@ -35,12 +35,12 @@ struct TrajectoryRef
  */
 struct PositionGains
 {
-  Eigen::Vector3d M1{Eigen::Vector3d::Ones()};
-  Eigen::Vector3d K1{Eigen::Vector3d::Ones()};
-  Eigen::Vector3d M2{Eigen::Vector3d::Ones()};
-  Eigen::Vector3d K2{Eigen::Vector3d::Ones()};
-  Eigen::Vector3d Pv{Eigen::Vector3d::Zero()};
-  Eigen::Vector3d Lv{Eigen::Vector3d::Ones()};
+  Eigen::Vector3d M_P{Eigen::Vector3d::Ones()};
+  Eigen::Vector3d K_P{Eigen::Vector3d::Ones()};
+  Eigen::Vector3d M_V{Eigen::Vector3d::Ones()};
+  Eigen::Vector3d K_V{Eigen::Vector3d::Ones()};
+  Eigen::Vector3d P_V{Eigen::Vector3d::Zero()};
+  Eigen::Vector3d L_V{Eigen::Vector3d::Ones()};
 };
 
 /**
@@ -48,12 +48,12 @@ struct PositionGains
  */
 struct AttitudeGains
 {
-  Eigen::Vector3d M_theta{Eigen::Vector3d::Ones()};
-  Eigen::Vector3d K_theta{Eigen::Vector3d::Ones()};
-  Eigen::Vector3d M_omega{Eigen::Vector3d::Ones()};
-  Eigen::Vector3d K_omega{Eigen::Vector3d::Ones()};
-  Eigen::Vector3d P_omega{Eigen::Vector3d::Zero()};
-  Eigen::Vector3d L_omega{Eigen::Vector3d::Ones()};
+  Eigen::Vector3d M_Angle{Eigen::Vector3d::Ones()};
+  Eigen::Vector3d K_Angle{Eigen::Vector3d::Ones()};
+  Eigen::Vector3d M_AngularVelocity{Eigen::Vector3d::Ones()};
+  Eigen::Vector3d K_AngularVelocity{Eigen::Vector3d::Ones()};
+  Eigen::Vector3d P_AngularVelocity{Eigen::Vector3d::Zero()};
+  Eigen::Vector3d L_AngularVelocity{Eigen::Vector3d::Ones()};
 };
 
 /**
@@ -157,8 +157,8 @@ private:
   double motor_force_max_{10.0};
   double max_tilt_rad_{0.0};
 
-  Eigen::Vector3d e_hat_v_{Eigen::Vector3d::Zero()};      ///< 速度误差观测器状态
-  Eigen::Vector3d e_hat_omega_{Eigen::Vector3d::Zero()};  ///< 角速度误差观测器状态
+  Eigen::Vector3d velocity_error_hat_ned_{Eigen::Vector3d::Zero()};  ///< 速度误差观测器状态(NED)
+  Eigen::Vector3d angular_velocity_error_hat_body_{Eigen::Vector3d::Zero()};  ///< 角速度误差观测器状态(FRD)
   bool first_run_{true};
 };
 

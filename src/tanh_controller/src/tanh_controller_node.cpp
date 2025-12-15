@@ -40,21 +40,25 @@ TanhControllerNode::TanhControllerNode(const rclcpp::NodeOptions & options)
     "model.inertia_diag", {0.02384669, 0.02394962, 0.04399995});
 
   // 位置环参数
-  this->declare_parameter<std::vector<double>>("position.M1", {1.0, 1.0, 1.0});
-  this->declare_parameter<std::vector<double>>("position.K1", {1.5, 1.5, 1.5});
-  this->declare_parameter<std::vector<double>>("position.M2", {3.0, 3.0, 3.0});
-  this->declare_parameter<std::vector<double>>("position.K2", {1.0, 1.0, 1.0});
+  this->declare_parameter<std::vector<double>>("position.M_P", {1.0, 1.0, 1.0});
+  this->declare_parameter<std::vector<double>>("position.K_P", {1.5, 1.5, 1.5});
+  this->declare_parameter<std::vector<double>>("position.M_V", {3.0, 3.0, 3.0});
+  this->declare_parameter<std::vector<double>>("position.K_V", {1.0, 1.0, 1.0});
   this->declare_parameter<double>("position.max_tilt_deg", 35.0);
-  this->declare_parameter<std::vector<double>>("position.observer.Pv", {0.0, 0.0, 0.0});
-  this->declare_parameter<std::vector<double>>("position.observer.Lv", {5.0, 5.0, 5.0});
+  this->declare_parameter<std::vector<double>>("position.observer.P_V", {0.0, 0.0, 0.0});
+  this->declare_parameter<std::vector<double>>("position.observer.L_V", {5.0, 5.0, 5.0});
 
   // 姿态环参数
-  this->declare_parameter<std::vector<double>>("attitude.M_theta", {3.0, 3.0, 3.0});
-  this->declare_parameter<std::vector<double>>("attitude.K_theta", {4.0, 4.0, 4.0});
-  this->declare_parameter<std::vector<double>>("attitude.M_omega", {20.0, 20.0, 15.0});
-  this->declare_parameter<std::vector<double>>("attitude.K_omega", {2.0, 2.0, 2.0});
-  this->declare_parameter<std::vector<double>>("attitude.observer.P_omega", {0.0, 0.0, 0.0});
-  this->declare_parameter<std::vector<double>>("attitude.observer.L_omega", {5.0, 5.0, 5.0});
+  this->declare_parameter<std::vector<double>>("attitude.M_Angle", {3.0, 3.0, 3.0});
+  this->declare_parameter<std::vector<double>>("attitude.K_Angle", {4.0, 4.0, 4.0});
+  this->declare_parameter<std::vector<double>>(
+    "attitude.M_AngularVelocity", {20.0, 20.0, 15.0});
+  this->declare_parameter<std::vector<double>>(
+    "attitude.K_AngularVelocity", {2.0, 2.0, 2.0});
+  this->declare_parameter<std::vector<double>>(
+    "attitude.observer.P_AngularVelocity", {0.0, 0.0, 0.0});
+  this->declare_parameter<std::vector<double>>(
+    "attitude.observer.L_AngularVelocity", {5.0, 5.0, 5.0});
 
   // 控制分配/电机映射参数
   this->declare_parameter<double>("allocation.l", 0.246073);
@@ -128,12 +132,12 @@ void TanhControllerNode::loadParams()
   }
 
   PositionGains pg;
-  pg.M1 = getVec3Param(*this, "position.M1");
-  pg.K1 = getVec3Param(*this, "position.K1");
-  pg.M2 = getVec3Param(*this, "position.M2");
-  pg.K2 = getVec3Param(*this, "position.K2");
-  pg.Pv = getVec3Param(*this, "position.observer.Pv");
-  pg.Lv = getVec3Param(*this, "position.observer.Lv");
+  pg.M_P = getVec3Param(*this, "position.M_P");
+  pg.K_P = getVec3Param(*this, "position.K_P");
+  pg.M_V = getVec3Param(*this, "position.M_V");
+  pg.K_V = getVec3Param(*this, "position.K_V");
+  pg.P_V = getVec3Param(*this, "position.observer.P_V");
+  pg.L_V = getVec3Param(*this, "position.observer.L_V");
   controller_.setPositionGains(pg);
 
   {
@@ -142,12 +146,12 @@ void TanhControllerNode::loadParams()
   }
 
   AttitudeGains ag;
-  ag.M_theta = getVec3Param(*this, "attitude.M_theta");
-  ag.K_theta = getVec3Param(*this, "attitude.K_theta");
-  ag.M_omega = getVec3Param(*this, "attitude.M_omega");
-  ag.K_omega = getVec3Param(*this, "attitude.K_omega");
-  ag.P_omega = getVec3Param(*this, "attitude.observer.P_omega");
-  ag.L_omega = getVec3Param(*this, "attitude.observer.L_omega");
+  ag.M_Angle = getVec3Param(*this, "attitude.M_Angle");
+  ag.K_Angle = getVec3Param(*this, "attitude.K_Angle");
+  ag.M_AngularVelocity = getVec3Param(*this, "attitude.M_AngularVelocity");
+  ag.K_AngularVelocity = getVec3Param(*this, "attitude.K_AngularVelocity");
+  ag.P_AngularVelocity = getVec3Param(*this, "attitude.observer.P_AngularVelocity");
+  ag.L_AngularVelocity = getVec3Param(*this, "attitude.observer.L_AngularVelocity");
   controller_.setAttitudeGains(ag);
 
   AllocationParams ap;
