@@ -294,31 +294,6 @@ void TanhControllerNode::setpointCallback(const px4_msgs::msg::TrajectorySetpoin
   ref_.position_ned = Eigen::Vector3d(x, y, z);
   ref_.yaw = std::isfinite(yaw) ? static_cast<double>(yaw) : 0.0;
 
-  const float vx = msg->velocity[0];
-  const float vy = msg->velocity[1];
-  const float vz = msg->velocity[2];
-  if (std::isfinite(vx) && std::isfinite(vy) && std::isfinite(vz)) {
-    ref_.velocity_ned = Eigen::Vector3d(vx, vy, vz);
-    ref_.has_velocity = true;
-  } else {
-    ref_.velocity_ned.setZero();
-    ref_.has_velocity = false;
-  }
-
-  const float ax = msg->acceleration[0];
-  const float ay = msg->acceleration[1];
-  const float az = msg->acceleration[2];
-  if (std::isfinite(ax) && std::isfinite(ay) && std::isfinite(az)) {
-    ref_.acceleration_ned = Eigen::Vector3d(ax, ay, az);
-    ref_.has_acceleration = true;
-  } else {
-    ref_.acceleration_ned.setZero();
-    ref_.has_acceleration = false;
-  }
-
-  const float yawspeed = msg->yawspeed;
-  ref_.yawspeed = std::isfinite(yawspeed) ? static_cast<double>(yawspeed) : 0.0;
-
   ref_.valid = true;
   has_ref_ = true;
 }

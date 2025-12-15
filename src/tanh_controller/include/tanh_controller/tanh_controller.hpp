@@ -21,12 +21,7 @@ struct VehicleState
 struct TrajectoryRef
 {
   Eigen::Vector3d position_ned{Eigen::Vector3d::Zero()}; ///< 期望位置 [m]
-  Eigen::Vector3d velocity_ned{Eigen::Vector3d::Zero()}; ///< 期望速度 [m/s]（可选）
-  Eigen::Vector3d acceleration_ned{Eigen::Vector3d::Zero()}; ///< 期望加速度 [m/s^2]（可选）
   double yaw{0.0};                                       ///< 期望航向角 [rad]
-  double yawspeed{0.0};                                  ///< 期望航向角速度 [rad/s]（可选）
-  bool has_velocity{false};                              ///< 是否提供速度前馈
-  bool has_acceleration{false};                          ///< 是否提供加速度前馈
   bool valid{false};                                    ///< 是否有效
 };
 
