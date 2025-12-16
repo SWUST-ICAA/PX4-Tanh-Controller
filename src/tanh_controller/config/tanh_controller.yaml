@@ -28,24 +28,24 @@ tanh_controller:
       K_Acceleration: [0.5, 0.5, 1.0]
       max_tilt_deg: 35.0
       observer:
-        P_V: [0.1, 0.1, 0.2]
+        P_V: [0.5, 0.5, 0.5]
         L_V: [0.5, 0.5, 0.5]
 
     attitude:
-      M_Angle: [2.0, 2.0, 1.0]
+      M_Angle: [2.0, 2.0, 2.0]
       K_Angle: [5.0, 5.0, 8.0]
       M_AngularVelocity: [8.0, 8.0, 8.0]
       K_AngularVelocity: [4.0, 4.0, 4.0]
       K_AngularAcceleration: [0.5, 0.5, 1.0]
       observer:
-        P_AngularVelocity: [0.1, 0.1, 0.1]
+        P_AngularVelocity: [0.5, 0.5, 0.5]
         L_AngularVelocity: [0.5, 0.5, 0.5]
 
     filters:
-      linear_accel_cutoff_hz: 30.0
-      angular_accel_cutoff_hz: 50.0
-      velocity_disturbance_cutoff_hz: 20.0
-      angular_velocity_disturbance_cutoff_hz: 20.0
+      linear_accel_cutoff_hz: 20.0
+      angular_accel_cutoff_hz: 30.0
+      velocity_disturbance_cutoff_hz: 10.0
+      angular_velocity_disturbance_cutoff_hz: 10.0
 
     allocation:
       l: 0.246073
