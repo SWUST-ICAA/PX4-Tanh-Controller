@@ -6,8 +6,8 @@ import os
 
 def generate_launch_description():
     """启动figure8_path_publisher节点，并加载yaml参数。"""
-    pkg_share = get_package_share_directory('figure8_path_publisher')
-    params_file = os.path.join(pkg_share, 'config', 'figure8_path_publisher.yaml')
+
+    params_file = 'src/figure8_path_publisher/config/figure8_path_publisher.yaml'
 
     return LaunchDescription([
         Node(
