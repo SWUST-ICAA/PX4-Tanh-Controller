@@ -44,6 +44,8 @@ tanh_controller:
     filters:
       linear_accel_cutoff_hz: 30.0
       angular_accel_cutoff_hz: 50.0
+      velocity_disturbance_cutoff_hz: 20.0
+      angular_velocity_disturbance_cutoff_hz: 20.0
 
     allocation:
       l: 0.246073

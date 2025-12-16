@@ -115,6 +115,12 @@ public:
   /** @brief 设置姿态环角加速度差分低通截止频率(Hz)，<=0表示关闭 */
   void setAngularAccelerationLowPassHz(double cutoff_hz);
 
+  /** @brief 设置位置环扰动估计μ_v低通截止频率(Hz)，<=0表示关闭 */
+  void setVelocityDisturbanceLowPassHz(double cutoff_hz);
+
+  /** @brief 设置姿态环扰动估计μ_Ω低通截止频率(Hz)，<=0表示关闭 */
+  void setAngularVelocityDisturbanceLowPassHz(double cutoff_hz);
+
   /** @brief 重置观测器状态 */
   void reset();
 
@@ -182,6 +188,14 @@ private:
   double angular_accel_lpf_cutoff_hz_{0.0};
   Eigen::Vector3d angular_accel_lpf_state_body_{Eigen::Vector3d::Zero()};
   bool angular_accel_lpf_initialized_{false};
+
+  double velocity_disturbance_lpf_cutoff_hz_{0.0};
+  Eigen::Vector3d velocity_disturbance_lpf_state_ned_{Eigen::Vector3d::Zero()};
+  bool velocity_disturbance_lpf_initialized_{false};
+
+  double angular_velocity_disturbance_lpf_cutoff_hz_{0.0};
+  Eigen::Vector3d angular_velocity_disturbance_lpf_state_body_{Eigen::Vector3d::Zero()};
+  bool angular_velocity_disturbance_lpf_initialized_{false};
 };
 
 }  // namespace tanh_controller

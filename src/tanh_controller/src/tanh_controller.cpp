@@ -73,6 +73,20 @@ void TanhController::setAngularAccelerationLowPassHz(double cutoff_hz)
   angular_accel_lpf_initialized_ = false;
 }
 
+void TanhController::setVelocityDisturbanceLowPassHz(double cutoff_hz)
+{
+  velocity_disturbance_lpf_cutoff_hz_ =
+    (std::isfinite(cutoff_hz) && cutoff_hz > 0.0) ? cutoff_hz : 0.0;
+  velocity_disturbance_lpf_initialized_ = false;
+}
+
+void TanhController::setAngularVelocityDisturbanceLowPassHz(double cutoff_hz)
+{
+  angular_velocity_disturbance_lpf_cutoff_hz_ =
+    (std::isfinite(cutoff_hz) && cutoff_hz > 0.0) ? cutoff_hz : 0.0;
+  angular_velocity_disturbance_lpf_initialized_ = false;
+}
+
 void TanhController::reset()
 {
   // 重置观测器内部状态
@@ -88,6 +102,11 @@ void TanhController::reset()
   angular_accel_lpf_state_body_.setZero();
   linear_accel_lpf_initialized_ = false;
   angular_accel_lpf_initialized_ = false;
+
+  velocity_disturbance_lpf_state_ned_.setZero();
+  angular_velocity_disturbance_lpf_state_body_.setZero();
+  velocity_disturbance_lpf_initialized_ = false;
+  angular_velocity_disturbance_lpf_initialized_ = false;
 }
 
 Eigen::Vector3d TanhController::tanhVec(const Eigen::Vector3d & x)
@@ -248,49 +267,74 @@ void TanhController::computePosition(
   // 观测误差 velocity_error_estimation_error = velocity_error - velocity_error_hat
   const Eigen::Vector3d velocity_error_estimation_error_ned =
     velocity_error_ned - velocity_error_hat_ned_;
-  const Eigen::Vector3d velocity_disturbance_estimate_ned =
+  const Eigen::Vector3d velocity_disturbance_estimate_ned_raw =
     pos_gains_.P_V.cwiseProduct(
       tanhVec(pos_gains_.L_V.cwiseProduct(velocity_error_estimation_error_ned)));
+  const Eigen::Vector3d velocity_disturbance_estimate_ned_filtered = lowPassVec3(
+    velocity_disturbance_estimate_ned_raw, velocity_disturbance_lpf_cutoff_hz_, dt,
+    &velocity_disturbance_lpf_state_ned_, &velocity_disturbance_lpf_initialized_);
 
   Eigen::Vector3d g_ned(0.0, 0.0, gravity_);
 
   // 推力矢量：T_d z_B,d
+  // 控制律使用滤波后的μ以降低尖峰/抖动；观测器更新使用原始μ以保持估计动态的快速性。
   const Eigen::Vector3d tanh_velocity_error =
     tanhVec(pos_gains_.K_V.cwiseProduct(velocity_error_ned));
-  Eigen::Vector3d thrust_vector_over_mass_ned =
-    velocity_disturbance_estimate_ned + g_ned +
+  Eigen::Vector3d thrust_vector_over_mass_ned_control =
+    velocity_disturbance_estimate_ned_filtered + g_ned +
+    pos_gains_.M_V.cwiseProduct(tanh_velocity_error) +
+    pos_gains_.K_Acceleration.cwiseProduct(linear_acceleration_ned);  // (T_d*z_B,d)/m
+  Eigen::Vector3d thrust_vector_over_mass_ned_observer =
+    velocity_disturbance_estimate_ned_raw + g_ned +
     pos_gains_.M_V.cwiseProduct(tanh_velocity_error) +
     pos_gains_.K_Acceleration.cwiseProduct(linear_acceleration_ned);  // (T_d*z_B,d)/m
 
   // 限制最大倾角：约束 ||v_xy|| <= v_z * tan(max_tilt)
   if (max_tilt_rad_ > 0.0) {
     // 避免出现需要倒飞(v_z<=0)的情况
-    thrust_vector_over_mass_ned.z() = std::max(thrust_vector_over_mass_ned.z(), 1e-3);
+    thrust_vector_over_mass_ned_control.z() =
+      std::max(thrust_vector_over_mass_ned_control.z(), 1e-3);
+    thrust_vector_over_mass_ned_observer.z() =
+      std::max(thrust_vector_over_mass_ned_observer.z(), 1e-3);
 
     const double horiz =
-      std::hypot(thrust_vector_over_mass_ned.x(), thrust_vector_over_mass_ned.y());
-    const double max_horiz = thrust_vector_over_mass_ned.z() * std::tan(max_tilt_rad_);
+      std::hypot(thrust_vector_over_mass_ned_control.x(), thrust_vector_over_mass_ned_control.y());
+    const double max_horiz =
+      thrust_vector_over_mass_ned_control.z() * std::tan(max_tilt_rad_);
     if (horiz > max_horiz && horiz > 1e-9) {
       const double scale = max_horiz / horiz;
-      thrust_vector_over_mass_ned.x() *= scale;
-      thrust_vector_over_mass_ned.y() *= scale;
+      thrust_vector_over_mass_ned_control.x() *= scale;
+      thrust_vector_over_mass_ned_control.y() *= scale;
+    }
+
+    const double horiz_observer =
+      std::hypot(thrust_vector_over_mass_ned_observer.x(), thrust_vector_over_mass_ned_observer.y());
+    const double max_horiz_observer =
+      thrust_vector_over_mass_ned_observer.z() * std::tan(max_tilt_rad_);
+    if (horiz_observer > max_horiz_observer && horiz_observer > 1e-9) {
+      const double scale = max_horiz_observer / horiz_observer;
+      thrust_vector_over_mass_ned_observer.x() *= scale;
+      thrust_vector_over_mass_ned_observer.y() *= scale;
     }
   }
 
-  const Eigen::Vector3d desired_thrust_vector_ned = mass_ * thrust_vector_over_mass_ned;
+  const Eigen::Vector3d desired_thrust_vector_ned_control =
+    mass_ * thrust_vector_over_mass_ned_control;
+  const Eigen::Vector3d desired_thrust_vector_ned_observer =
+    mass_ * thrust_vector_over_mass_ned_observer;
 
   // 更新速度扰动观测器 ê_v
   const Eigen::Vector3d velocity_error_hat_dot_ned =
-    (-desired_thrust_vector_ned / mass_) + g_ned + velocity_disturbance_estimate_ned;
+    (-desired_thrust_vector_ned_observer / mass_) + g_ned + velocity_disturbance_estimate_ned_raw;
   velocity_error_hat_ned_ += dt * velocity_error_hat_dot_ned;
   last_velocity_ned_ = state.velocity_ned;
   has_last_velocity_ = true;
 
   if (thrust_vec_ned) {
-    *thrust_vec_ned = desired_thrust_vector_ned;
+    *thrust_vec_ned = desired_thrust_vector_ned_control;
   }
   if (thrust_norm) {
-    *thrust_norm = desired_thrust_vector_ned.norm();
+    *thrust_norm = desired_thrust_vector_ned_control.norm();
   }
 }
 
@@ -351,9 +395,12 @@ void TanhController::computeAttitude(
   // 观测误差：angular_velocity_estimation_error = angular_velocity_error - angular_velocity_error_hat
   const Eigen::Vector3d angular_velocity_estimation_error_body =
     angular_velocity_error_body - angular_velocity_error_hat_body_;
-  const Eigen::Vector3d angular_velocity_disturbance_estimate_body =
+  const Eigen::Vector3d angular_velocity_disturbance_estimate_body_raw =
     att_gains_.P_AngularVelocity.cwiseProduct(
       tanhVec(att_gains_.L_AngularVelocity.cwiseProduct(angular_velocity_estimation_error_body)));
+  const Eigen::Vector3d angular_velocity_disturbance_estimate_body_filtered = lowPassVec3(
+    angular_velocity_disturbance_estimate_body_raw, angular_velocity_disturbance_lpf_cutoff_hz_, dt,
+    &angular_velocity_disturbance_lpf_state_body_, &angular_velocity_disturbance_lpf_initialized_);
 
   const Eigen::Vector3d angular_velocity_body = state.angular_velocity_body;
   const Eigen::Vector3d omega_cross_Iomega =
@@ -365,21 +412,25 @@ void TanhController::computeAttitude(
     tanhVec(att_gains_.K_AngularVelocity.cwiseProduct(angular_velocity_error_body));
   const Eigen::Vector3d angular_velocity_control_term =
     att_gains_.M_AngularVelocity.cwiseProduct(tanh_angular_velocity_error);
-  const Eigen::Vector3d desired_torque_body =
-    omega_cross_Iomega - inertia_ * angular_velocity_disturbance_estimate_body -
+  const Eigen::Vector3d desired_torque_body_control =
+    omega_cross_Iomega - inertia_ * angular_velocity_disturbance_estimate_body_filtered -
+    inertia_ * angular_velocity_control_term -
+    inertia_ * att_gains_.K_AngularAcceleration.cwiseProduct(angular_acceleration_body);
+  const Eigen::Vector3d desired_torque_body_observer =
+    omega_cross_Iomega - inertia_ * angular_velocity_disturbance_estimate_body_raw -
     inertia_ * angular_velocity_control_term -
     inertia_ * att_gains_.K_AngularAcceleration.cwiseProduct(angular_acceleration_body);
 
   // 更新角速度误差观测器 ê_Omega
   const Eigen::Vector3d angular_velocity_error_hat_dot_body =
-    (-inertia_inv * omega_cross_Iomega) + inertia_inv * desired_torque_body +
-    angular_velocity_disturbance_estimate_body;
+    (-inertia_inv * omega_cross_Iomega) + inertia_inv * desired_torque_body_observer +
+    angular_velocity_disturbance_estimate_body_raw;
   angular_velocity_error_hat_body_ += dt * angular_velocity_error_hat_dot_body;
   last_angular_velocity_body_ = state.angular_velocity_body;
   has_last_angular_velocity_ = true;
 
   if (torque_body) {
-    *torque_body = desired_torque_body;
+    *torque_body = desired_torque_body_control;
   }
 }
 

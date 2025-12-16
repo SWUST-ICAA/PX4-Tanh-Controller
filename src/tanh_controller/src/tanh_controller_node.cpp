@@ -66,6 +66,9 @@ TanhControllerNode::TanhControllerNode(const rclcpp::NodeOptions & options)
   // 滤波参数（对差分得到的加速度/角加速度做低通，抑制高频噪声导致的震荡）
   this->declare_parameter<double>("filters.linear_accel_cutoff_hz", 0.0);
   this->declare_parameter<double>("filters.angular_accel_cutoff_hz", 0.0);
+  // 滤波参数（对扰动观测器输出μ做低通，降低估计尖峰引起的抖动）
+  this->declare_parameter<double>("filters.velocity_disturbance_cutoff_hz", 0.0);
+  this->declare_parameter<double>("filters.angular_velocity_disturbance_cutoff_hz", 0.0);
 
   // 控制分配/电机映射参数
   this->declare_parameter<double>("allocation.l", 0.246073);
@@ -167,6 +170,10 @@ void TanhControllerNode::loadParams()
     this->get_parameter("filters.linear_accel_cutoff_hz").as_double());
   controller_.setAngularAccelerationLowPassHz(
     this->get_parameter("filters.angular_accel_cutoff_hz").as_double());
+  controller_.setVelocityDisturbanceLowPassHz(
+    this->get_parameter("filters.velocity_disturbance_cutoff_hz").as_double());
+  controller_.setAngularVelocityDisturbanceLowPassHz(
+    this->get_parameter("filters.angular_velocity_disturbance_cutoff_hz").as_double());
 
   AllocationParams ap;
   ap.l = this->get_parameter("allocation.l").as_double();
