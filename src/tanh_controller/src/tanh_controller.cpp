@@ -341,27 +341,9 @@ Eigen::Vector4d TanhController::allocateMotors(
 {
   // 控制分配：由(T,τ)求解单电机推力（对应推导中的G1）
   // [T, tau_x, tau_y, tau_z]^T = G1 * f，求解 f = G1^{-1} * wrench
-  // 注意：电机推力存在上下限(0..motor_force_max_)，若不做限幅会导致求解结果出现负推力，
-  // 进而出现“部分电机0/部分电机满油门”，总推力反而不足（表现为解锁但起不来）。
-  const double f_max = motor_force_max_;
-  const double t_max = 4.0 * f_max;
-
-  // 将总推力裁剪到可实现范围内
-  const double thrust_use = std::clamp(thrust_total, 0.0, t_max);
-
-  // 根据当前可用推力余量，对各轴力矩做保守限幅（避免分配得到负推力）
-  // 这里使用两两电机“对称成对”的上界：|tau| <= coeff * min(T, T_max - T)
-  const double margin = std::max(0.0, std::min(thrust_use, t_max - thrust_use));
   const double s = std::sin(alloc_.beta);
   const double c = std::cos(alloc_.beta);
   const double l = alloc_.l;
-  const double tau_x_max = std::abs(l * s) * margin;
-  const double tau_y_max = std::abs(l * c) * margin;
-  const double tau_z_max = std::abs(alloc_.cq_ct) * margin;
-
-  const double tau_x = std::clamp(torque_body.x(), -tau_x_max, tau_x_max);
-  const double tau_y = std::clamp(torque_body.y(), -tau_y_max, tau_y_max);
-  const double tau_z = std::clamp(torque_body.z(), -tau_z_max, tau_z_max);
 
   Eigen::Matrix4d G1;
   G1 << 1.0, 1.0, 1.0, 1.0,
@@ -370,17 +352,15 @@ Eigen::Vector4d TanhController::allocateMotors(
     -alloc_.cq_ct, alloc_.cq_ct, -alloc_.cq_ct, alloc_.cq_ct;
 
   Eigen::Vector4d wrench;
-  wrench << thrust_use, tau_x, tau_y, tau_z;
+  wrench << thrust_total, torque_body.x(), torque_body.y(), torque_body.z();
 
   // 使用LU求解，避免显式求逆
   Eigen::Vector4d forces = G1.fullPivLu().solve(wrench);
 
-  // 推力限幅：限制在[0, f_max]
   for (int i = 0; i < 4; ++i) {
     if (!std::isfinite(forces(i))) {
       forces(i) = 0.0;
     }
-    forces(i) = std::clamp(forces(i), 0.0, f_max);
   }
 
   return forces;
