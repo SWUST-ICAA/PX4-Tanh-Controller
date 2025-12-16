@@ -2,6 +2,8 @@
 
 #include <Eigen/Dense>
 
+#include <cmath>
+
 namespace tanh_controller {
 
 /**
@@ -107,6 +109,12 @@ public:
   /** @brief 设置位置环最大倾角限制（单位rad，<=0表示不限制） */
   void setMaxTilt(double max_tilt_rad);
 
+  /** @brief 设置位置环加速度差分低通截止频率(Hz)，<=0表示关闭 */
+  void setLinearAccelerationLowPassHz(double cutoff_hz);
+
+  /** @brief 设置姿态环角加速度差分低通截止频率(Hz)，<=0表示关闭 */
+  void setAngularAccelerationLowPassHz(double cutoff_hz);
+
   /** @brief 重置观测器状态 */
   void reset();
 
@@ -123,6 +131,11 @@ public:
 private:
   /** @brief 逐元素tanh饱和 */
   static Eigen::Vector3d tanhVec(const Eigen::Vector3d & x);
+
+  /** @brief 一阶低通(逐元素)，用于差分导数抑噪；cutoff<=0时直通 */
+  static Eigen::Vector3d lowPassVec3(
+    const Eigen::Vector3d & x, double cutoff_hz, double dt,
+    Eigen::Vector3d * state, bool * initialized);
 
   /** @brief 根据推力方向和航向角计算期望姿态 */
   Eigen::Quaterniond computeDesiredAttitude(
@@ -161,6 +174,14 @@ private:
   bool has_last_velocity_{false};
   bool has_last_angular_velocity_{false};
   bool first_run_{true};
+
+  double linear_accel_lpf_cutoff_hz_{0.0};
+  Eigen::Vector3d linear_accel_lpf_state_ned_{Eigen::Vector3d::Zero()};
+  bool linear_accel_lpf_initialized_{false};
+
+  double angular_accel_lpf_cutoff_hz_{0.0};
+  Eigen::Vector3d angular_accel_lpf_state_body_{Eigen::Vector3d::Zero()};
+  bool angular_accel_lpf_initialized_{false};
 };
 
 }  // namespace tanh_controller

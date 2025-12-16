@@ -41,6 +41,10 @@ tanh_controller:
         P_AngularVelocity: [0.1, 0.1, 0.1]
         L_AngularVelocity: [0.5, 0.5, 0.5]
 
+    filters:
+      linear_accel_cutoff_hz: 30.0
+      angular_accel_cutoff_hz: 50.0
+
     allocation:
       l: 0.246073
       beta: 0.78539816339

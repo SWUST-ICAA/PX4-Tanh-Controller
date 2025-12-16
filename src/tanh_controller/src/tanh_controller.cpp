@@ -61,6 +61,18 @@ void TanhController::setMaxTilt(double max_tilt_rad)
   max_tilt_rad_ = std::clamp(max_tilt_rad, 1e-3, (M_PI_2 - 1e-3));
 }
 
+void TanhController::setLinearAccelerationLowPassHz(double cutoff_hz)
+{
+  linear_accel_lpf_cutoff_hz_ = (std::isfinite(cutoff_hz) && cutoff_hz > 0.0) ? cutoff_hz : 0.0;
+  linear_accel_lpf_initialized_ = false;
+}
+
+void TanhController::setAngularAccelerationLowPassHz(double cutoff_hz)
+{
+  angular_accel_lpf_cutoff_hz_ = (std::isfinite(cutoff_hz) && cutoff_hz > 0.0) ? cutoff_hz : 0.0;
+  angular_accel_lpf_initialized_ = false;
+}
+
 void TanhController::reset()
 {
   // 重置观测器内部状态
@@ -71,12 +83,41 @@ void TanhController::reset()
   has_last_velocity_ = false;
   has_last_angular_velocity_ = false;
   first_run_ = true;
+
+  linear_accel_lpf_state_ned_.setZero();
+  angular_accel_lpf_state_body_.setZero();
+  linear_accel_lpf_initialized_ = false;
+  angular_accel_lpf_initialized_ = false;
 }
 
 Eigen::Vector3d TanhController::tanhVec(const Eigen::Vector3d & x)
 {
   // 逐元素tanh
   return x.array().tanh().matrix();
+}
+
+Eigen::Vector3d TanhController::lowPassVec3(
+  const Eigen::Vector3d & x, double cutoff_hz, double dt,
+  Eigen::Vector3d * state, bool * initialized)
+{
+  if (!state || !initialized) {
+    return x;
+  }
+  if (!(cutoff_hz > 0.0) || !std::isfinite(cutoff_hz) || !(dt > 0.0) || !std::isfinite(dt)) {
+    return x;
+  }
+
+  const double tau = 1.0 / (2.0 * M_PI * cutoff_hz);
+  const double alpha = dt / (tau + dt);
+
+  if (!(*initialized)) {
+    *state = x;
+    *initialized = true;
+    return x;
+  }
+
+  *state += alpha * (x - *state);
+  return *state;
 }
 
 bool TanhController::compute(
@@ -194,6 +235,9 @@ void TanhController::computePosition(
   if (!linear_acceleration_ned.allFinite()) {
     linear_acceleration_ned.setZero();
   }
+  linear_acceleration_ned = lowPassVec3(
+    linear_acceleration_ned, linear_accel_lpf_cutoff_hz_, dt,
+    &linear_accel_lpf_state_ned_, &linear_accel_lpf_initialized_);
 
   // 速度误差 e_v
   const Eigen::Vector3d tanh_position_error =
@@ -285,6 +329,9 @@ void TanhController::computeAttitude(
   if (!angular_acceleration_body.allFinite()) {
     angular_acceleration_body.setZero();
   }
+  angular_acceleration_body = lowPassVec3(
+    angular_acceleration_body, angular_accel_lpf_cutoff_hz_, dt,
+    &angular_accel_lpf_state_body_, &angular_accel_lpf_initialized_);
 
   // 四元数误差：q_e' = q_d^{-1} ⊗ q（对应 R_e = R_d^T R）
   Eigen::Quaterniond q_error = q_d.conjugate() * q;

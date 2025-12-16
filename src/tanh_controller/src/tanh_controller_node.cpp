@@ -63,6 +63,10 @@ TanhControllerNode::TanhControllerNode(const rclcpp::NodeOptions & options)
   this->declare_parameter<std::vector<double>>(
     "attitude.observer.L_AngularVelocity", {5.0, 5.0, 5.0});
 
+  // 滤波参数（对差分得到的加速度/角加速度做低通，抑制高频噪声导致的震荡）
+  this->declare_parameter<double>("filters.linear_accel_cutoff_hz", 0.0);
+  this->declare_parameter<double>("filters.angular_accel_cutoff_hz", 0.0);
+
   // 控制分配/电机映射参数
   this->declare_parameter<double>("allocation.l", 0.246073);
   this->declare_parameter<double>("allocation.beta", M_PI_4);
@@ -158,6 +162,11 @@ void TanhControllerNode::loadParams()
   ag.P_AngularVelocity = getVec3Param(*this, "attitude.observer.P_AngularVelocity");
   ag.L_AngularVelocity = getVec3Param(*this, "attitude.observer.L_AngularVelocity");
   controller_.setAttitudeGains(ag);
+
+  controller_.setLinearAccelerationLowPassHz(
+    this->get_parameter("filters.linear_accel_cutoff_hz").as_double());
+  controller_.setAngularAccelerationLowPassHz(
+    this->get_parameter("filters.angular_accel_cutoff_hz").as_double());
 
   AllocationParams ap;
   ap.l = this->get_parameter("allocation.l").as_double();
