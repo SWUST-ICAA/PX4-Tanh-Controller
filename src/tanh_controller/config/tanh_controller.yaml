@@ -23,13 +23,13 @@ tanh_controller:
     position:
       M_P: [2.0, 2.0, 2.0]
       K_P: [1.0, 1.0, 1.0]
-      M_V: [6.0, 6.0, 6.5]
+      M_V: [6.5, 6.5, 6.5]
       K_V: [0.5, 0.5, 0.5]
-      K_Acceleration: [0.5, 0.5, 1.0]
+      K_Acceleration: [1.0, 1.0, 1.0]
       max_tilt_deg: 35.0
       observer:
         P_V: [2.5, 2.5, 2.5]
-        L_V: [1.0, 1.0, 2.5]
+        L_V: [1.5, 1.5, 2.5]
 
     attitude:
       M_Angle: [2.0, 2.0, 2.0]

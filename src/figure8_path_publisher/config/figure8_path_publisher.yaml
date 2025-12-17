@@ -1,7 +1,7 @@
 figure8_path_publisher:
   ros__parameters:
     publish_to_controller: true
-    publish_to_px4: true
+    publish_to_px4: false
     publish_path: false
     publish_rate_hz: 50.0
 
